@@ -34,11 +34,13 @@ import {
   Search,
   ArrowLeft,
   BarChart3,
-  PieChart
+  PieChart,
+  UserPlus,
+  FolderOpen
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
 const myFirebaseConfig = {
@@ -1392,41 +1394,40 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
   );
 };
 
-// --- MÓDULO DASHBOARD ADMIN MEJORADO ---
+// --- MÓDULO DASHBOARD ADMIN MEJORADO CON CLIENTES ---
 const AdminDashboard = ({ onExit }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState('');
+  
+  // Data States
+  const [viewMode, setViewMode] = useState('leads'); // 'leads' o 'clients'
   const [leads, setLeads] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   
-  // Estados para estadísticas
-  const [stats, setStats] = useState({
-    total: 0,
-    thisWeek: 0,
-    topInterest: '-'
-  });
+  // KPI States
+  const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
+  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0 });
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (passcode === 'lexnova2026') {
       setIsAuthenticated(true);
-      fetchLeads();
+      fetchData();
     } else {
       setErrorMsg('Contraseña incorrecta.');
       setPasscode('');
     }
   };
 
-  const calculateStats = (data) => {
+  const calculateLeadsStats = (data) => {
     const total = data.length;
-    
-    // Calcular prospectos de los últimos 7 días
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const thisWeek = data.filter(lead => new Date(lead.fechaRegistro) > oneWeekAgo).length;
 
-    // Calcular el interés principal
     const interestCounts = data.reduce((acc, lead) => {
       acc[lead.interest] = (acc[lead.interest] || 0) + 1;
       return acc;
@@ -1440,26 +1441,81 @@ const AdminDashboard = ({ onExit }) => {
         topInterest = key === 'ia-legal' ? 'IA Legal' : key === 'vigilancia' ? 'Vigilancia' : 'Case Mgmt';
       }
     }
-
-    setStats({ total, thisWeek, topInterest });
+    setLeadsStats({ total, thisWeek, topInterest });
   };
 
-  const fetchLeads = async () => {
+  const calculateClientsStats = (data) => {
+    const total = data.length;
+    const activeCases = data.filter(c => c.estadoActual && !c.estadoActual.toLowerCase().includes('cerrado')).length;
+    const nextHearings = data.filter(c => c.proximaAudiencia && !c.proximaAudiencia.toLowerCase().includes('pendiente')).length;
+    setClientsStats({ total, activeCases, nextHearings });
+  };
+
+  const fetchData = async () => {
     if (!db) return;
     setLoading(true);
     try {
+      // 1. Obtener Leads
       const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
-      const snapshot = await getDocs(leadsRef);
+      const leadsSnap = await getDocs(leadsRef);
       const leadsData = [];
-      snapshot.forEach(doc => {
-        leadsData.push({ id: doc.id, ...doc.data() });
-      });
+      leadsSnap.forEach(doc => leadsData.push({ id: doc.id, ...doc.data() }));
       leadsData.sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro));
       setLeads(leadsData);
-      calculateStats(leadsData);
+      calculateLeadsStats(leadsData);
+
+      // 2. Obtener Clientes
+      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+      const clientsSnap = await getDocs(clientsRef);
+      const clientsData = [];
+      clientsSnap.forEach(doc => clientsData.push({ id: doc.id, ...doc.data() }));
+      setClients(clientsData);
+      calculateClientsStats(clientsData);
+
     } catch (error) {
-      console.error("Error al obtener leads:", error);
+      console.error("Error fetching data:", error);
       setErrorMsg("Error al conectar con la base de datos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función Mágica para convertir Prospecto en Cliente
+  const handleConvertToClient = async (lead) => {
+    if (!db) return;
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      // 1. Crear un nuevo Cliente en Firebase
+      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+      const newExpediente = `#${Math.floor(Math.random() * 9000) + 1000}-${lead.interest === 'ia-legal' ? 'IAL' : 'LIT'}`;
+      
+      await addDoc(clientsRef, {
+        email: lead.email,
+        password: 'lexnova' + Math.floor(Math.random() * 1000), // Contraseña auto-generada
+        nombre: lead.name,
+        expediente: newExpediente,
+        estadoActual: 'Estudio Inicial',
+        proximaAudiencia: 'Pendiente de fijación',
+        juzgado: 'Por Asignar',
+        timeline: [
+          { title: 'Recepción de Caso', date: new Date().toLocaleDateString(), desc: 'Prospecto convertido desde sitio web.', done: true },
+          { title: 'Firma de Poder', date: 'Pendiente', desc: 'A la espera de formalización.', done: false }
+        ],
+        documentos: []
+      });
+
+      // 2. Marcar el Lead original como convertido
+      const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', lead.id);
+      await updateDoc(leadDocRef, { estado: 'convertido' });
+
+      setSuccessMsg(`¡${lead.name} convertido a Cliente exitosamente!`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+      
+      await fetchData(); // Refrescar las tablas
+    } catch (error) {
+      console.error("Error en conversión:", error);
+      setErrorMsg("No se pudo convertir al cliente.");
     } finally {
       setLoading(false);
     }
@@ -1508,16 +1564,16 @@ const AdminDashboard = ({ onExit }) => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 p-6 animate-fade-in">
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-white/10 pb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-white/10 pb-6">
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <Database className="w-8 h-8 text-cyan-400" />
               Intelligence Dashboard
             </h1>
-            <p className="text-slate-400 mt-2">Métricas y gestión de prospectos en tiempo real.</p>
+            <p className="text-slate-400 mt-2">Métricas y gestión de ciclo de vida del cliente.</p>
           </div>
           <div className="flex gap-4">
-            <button onClick={fetchLeads} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
+            <button onClick={fetchData} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
               <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
             </button>
             <button onClick={onExit} className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm hover:bg-red-500/20 transition-colors flex items-center gap-2">
@@ -1526,103 +1582,201 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         </div>
 
-        {/* --- TARJETAS DE ESTADÍSTICAS (KPIs) --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 blur-2xl rounded-full pointer-events-none" />
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Total Prospectos</p>
-              <Users className="w-5 h-5 text-cyan-400" />
-            </div>
-            <p className="text-4xl font-bold text-white">{stats.total}</p>
-            <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-               Acumulado histórico
-            </p>
+        {/* Notificación de Éxito al Convertir */}
+        {successMsg && (
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 flex items-center gap-3 animate-fade-in-down">
+            <CheckCircle2 className="w-5 h-5" />
+            <p className="font-medium">{successMsg}</p>
           </div>
+        )}
 
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full pointer-events-none" />
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Nuevos (7 Días)</p>
-              <BarChart3 className="w-5 h-5 text-emerald-400" />
-            </div>
-            <p className="text-4xl font-bold text-white">{stats.thisWeek}</p>
-            <p className="text-xs text-emerald-400/80 mt-2 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> Tendencia de crecimiento
-            </p>
-          </div>
-
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full pointer-events-none" />
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Servicio Top</p>
-              <PieChart className="w-5 h-5 text-purple-400" />
-            </div>
-            <p className="text-2xl font-bold text-white mt-2">{stats.topInterest}</p>
-            <p className="text-xs text-slate-500 mt-2">Más solicitado</p>
-          </div>
+        {/* TABS DE NAVEGACIÓN */}
+        <div className="flex bg-slate-900 p-1.5 rounded-xl mb-8 w-fit border border-white/10 shadow-lg">
+          <button
+            onClick={() => setViewMode('leads')}
+            className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'leads' ? 'bg-white/10 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <Users className="w-4 h-4" />
+            Prospectos ({leads.filter(l => l.estado !== 'convertido').length})
+          </button>
+          <button
+            onClick={() => setViewMode('clients')}
+            className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'clients' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <FolderOpen className="w-4 h-4" />
+            Clientes Activos ({clients.length})
+          </button>
         </div>
 
+        {/* --- TARJETAS DE ESTADÍSTICAS (Dependen del ViewMode) --- */}
+        {viewMode === 'leads' ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in">
+            <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Total Histórico</p>
+                <Users className="w-5 h-5 text-cyan-400" />
+              </div>
+              <p className="text-4xl font-bold text-white">{leadsStats.total}</p>
+              <p className="text-xs text-slate-500 mt-2">Leads capturados global</p>
+            </div>
+            <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Nuevos (7 Días)</p>
+                <BarChart3 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <p className="text-4xl font-bold text-white">{leadsStats.thisWeek}</p>
+              <p className="text-xs text-emerald-400/80 mt-2 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Tendencia actual</p>
+            </div>
+            <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Servicio Top</p>
+                <PieChart className="w-5 h-5 text-purple-400" />
+              </div>
+              <p className="text-2xl font-bold text-white mt-2">{leadsStats.topInterest}</p>
+              <p className="text-xs text-slate-500 mt-2">Mayor intención de compra</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in">
+            <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Cartera de Clientes</p>
+                <Briefcase className="w-5 h-5 text-indigo-400" />
+              </div>
+              <p className="text-4xl font-bold text-white">{clientsStats.total}</p>
+              <p className="text-xs text-slate-500 mt-2">Fichas creadas en portal</p>
+            </div>
+            <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Casos Activos</p>
+                <Activity className="w-5 h-5 text-blue-400" />
+              </div>
+              <p className="text-4xl font-bold text-white">{clientsStats.activeCases}</p>
+              <p className="text-xs text-slate-500 mt-2">Expedientes en curso</p>
+            </div>
+            <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Audiencias Fijadas</p>
+                <CalendarCheck className="w-5 h-5 text-yellow-400" />
+              </div>
+              <p className="text-4xl font-bold text-white">{clientsStats.nextHearings}</p>
+              <p className="text-xs text-slate-500 mt-2">Requieren atención próxima</p>
+            </div>
+          </div>
+        )}
+
+        {/* --- TABLAS (Dependen del ViewMode) --- */}
         <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
           <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-slate-950/50">
-            <h2 className="text-lg font-semibold text-white">Detalle de Registros</h2>
+            <h2 className="text-lg font-semibold text-white">
+              {viewMode === 'leads' ? 'Bandeja de Entrada Web' : 'Directorio de Expedientes'}
+            </h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="text" placeholder="Buscar por nombre o correo..." className="w-full md:w-64 bg-slate-900 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-cyan-400 transition-colors" />
+              <input type="text" placeholder="Buscar..." className="w-full md:w-64 bg-slate-900 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-cyan-400 transition-colors" />
             </div>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-950/80 border-b border-white/5 text-slate-400">
-                <tr>
-                  <th className="p-4 font-medium">Nombre Completo</th>
-                  <th className="p-4 font-medium">Contacto</th>
-                  <th className="p-4 font-medium">Área de Interés</th>
-                  <th className="p-4 font-medium">Fecha</th>
-                  <th className="p-4 font-medium text-center">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {loading && leads.length === 0 ? (
+            {viewMode === 'leads' ? (
+              <table className="w-full text-left text-sm whitespace-nowrap animate-fade-in">
+                <thead className="bg-slate-950/80 border-b border-white/5 text-slate-400">
                   <tr>
-                    <td colSpan="5" className="p-8 text-center text-slate-500">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                      Calculando métricas y cargando datos...
-                    </td>
+                    <th className="p-4 font-medium">Nombre Completo</th>
+                    <th className="p-4 font-medium">Contacto</th>
+                    <th className="p-4 font-medium">Área de Interés</th>
+                    <th className="p-4 font-medium">Fecha</th>
+                    <th className="p-4 font-medium text-right">Acción</th>
                   </tr>
-                ) : leads.length === 0 ? (
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading && leads.length === 0 ? (
+                    <tr><td colSpan="5" className="p-8 text-center text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />Cargando prospectos...</td></tr>
+                  ) : leads.filter(l => l.estado !== 'convertido').length === 0 ? (
+                    <tr><td colSpan="5" className="p-8 text-center text-slate-500">No hay prospectos pendientes. ¡Buen trabajo!</td></tr>
+                  ) : (
+                    leads.filter(l => l.estado !== 'convertido').map((lead) => (
+                      <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="p-4">
+                          <div className="font-semibold text-white">{lead.name}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-slate-300">{lead.email}</div>
+                          <div className="text-slate-500 text-xs mt-0.5">{lead.phone}</div>
+                        </td>
+                        <td className="p-4">
+                          <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs">
+                            {lead.interest === 'ia-legal' ? 'IA Legal' : lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : 'Case Management'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-400">
+                          {new Date(lead.fechaRegistro).toLocaleDateString()}
+                        </td>
+                        <td className="p-4 text-right">
+                          <button 
+                            onClick={() => handleConvertToClient(lead)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-lg shadow-indigo-500/20"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Convertir a Cliente
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-left text-sm whitespace-nowrap animate-fade-in">
+                <thead className="bg-slate-950/80 border-b border-white/5 text-slate-400">
                   <tr>
-                    <td colSpan="5" className="p-8 text-center text-slate-500">
-                      Aún no hay prospectos registrados.
-                    </td>
+                    <th className="p-4 font-medium">Cliente / Titular</th>
+                    <th className="p-4 font-medium">No. Expediente</th>
+                    <th className="p-4 font-medium">Estado Procesal</th>
+                    <th className="p-4 font-medium">Despacho</th>
+                    <th className="p-4 font-medium text-right">Contraseña Portal</th>
                   </tr>
-                ) : (
-                  leads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="p-4">
-                        <div className="font-semibold text-white">{lead.name}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-slate-300">{lead.email}</div>
-                        <div className="text-slate-500 text-xs mt-0.5">{lead.phone}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs">
-                          {lead.interest === 'ia-legal' ? 'IA Legal' : lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : 'Case Management'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-400">
-                        {new Date(lead.fechaRegistro).toLocaleDateString()} a las {new Date(lead.fechaRegistro).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="inline-flex w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" title="Nuevo Prospecto"></span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {loading && clients.length === 0 ? (
+                    <tr><td colSpan="5" className="p-8 text-center text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />Cargando cartera de clientes...</td></tr>
+                  ) : clients.length === 0 ? (
+                    <tr><td colSpan="5" className="p-8 text-center text-slate-500">Aún no hay clientes creados. Convierte un prospecto para empezar.</td></tr>
+                  ) : (
+                    clients.map((client) => (
+                      <tr key={client.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="p-4">
+                          <div className="font-semibold text-white">{client.nombre}</div>
+                          <div className="text-slate-500 text-xs mt-0.5">{client.email}</div>
+                        </td>
+                        <td className="p-4 font-mono text-xs text-indigo-300 bg-indigo-500/5 rounded px-2 py-1 inline-block mt-2">
+                          {client.expediente}
+                        </td>
+                        <td className="p-4">
+                          <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 rounded-full text-xs">
+                            {client.estadoActual}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-400">
+                          {client.juzgado}
+                        </td>
+                        <td className="p-4 text-right">
+                          <span className="font-mono text-xs text-slate-500 hover:text-white cursor-pointer px-2 py-1 bg-slate-950 rounded border border-white/5" title="Contraseña generada para el cliente">
+                            {client.password}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
