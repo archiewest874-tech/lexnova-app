@@ -29,14 +29,16 @@ import {
   Award,
   X,
   Phone,
-  Menu
+  Menu,
+  Users,
+  Search,
+  ArrowLeft
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
-// Si estás en Vercel/Local, reemplaza este objeto con la configuración de tu proyecto de Firebase (Firestore).
 const myFirebaseConfig = {
   apiKey: "AIzaSyCUSLPFX9ER2M8wBO2LZ34pg6V7kSZGzJU",
   authDomain: "lexnova-production.firebaseapp.com",
@@ -46,7 +48,6 @@ const myFirebaseConfig = {
   appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
 };
 
-// Configuración híbrida (Funciona en Canvas y en tu Vercel)
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 const finalConfig = envConfig && Object.keys(envConfig).length > 0 ? envConfig : myFirebaseConfig;
 
@@ -74,7 +75,6 @@ const useScrollReveal = () => {
   }, []);
 };
 
-// --- Helper for smooth scrolling across components ---
 const scrollToSection = (e, targetId) => {
   e.preventDefault();
   const container = document.getElementById('main-scroll-container');
@@ -100,7 +100,7 @@ const NavBar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavClick = (e, targetId) => {
-    setIsMobileMenuOpen(false); // Cierra el menú al hacer clic en móvil
+    setIsMobileMenuOpen(false); 
     scrollToSection(e, targetId);
   };
 
@@ -143,7 +143,6 @@ const NavBar = () => {
         <button 
           className="lg:hidden text-slate-300 hover:text-white p-2 transition-colors"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Alternar menú"
         >
           {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
         </button>
@@ -191,12 +190,10 @@ const Hero = ({ onOpenModal }) => {
           <span>El futuro del litigio y la gestión legal</span>
         </div>
         
-        {/* Agregado mb-16 y pb-4 para mayor separación con el párrafo inferior */}
         <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-tight leading-tight mb-16 pb-4">
           Transformación Digital <br className="hidden md:block"/> para el Abogado Moderno.
         </h1>
         
-        {/* Agregado mt-4 para empujar el texto hacia abajo y asegurar separación visual */}
         <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12 mt-4 leading-relaxed">
           Supera las barreras del Código General del Proceso. Centraliza expedientes, automatiza tiempos y potencia tu firma con Inteligencia Artificial y gestión CRM avanzada.
         </p>
@@ -288,14 +285,8 @@ const AILabModule = () => {
         const response = await fetch(url, options);
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`Error de API (Código ${response.status}):`, errorText);
-          
-          if (response.status === 401 || response.status === 403) {
-            throw new Error(`Error de autenticación: ${response.status}`);
-          }
-          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-            throw new Error(`Error de cliente: ${response.status}`);
-          }
+          if (response.status === 401 || response.status === 403) throw new Error(`Error de autenticación: ${response.status}`);
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) throw new Error(`Error de cliente: ${response.status}`);
           throw new Error(`Error de red o servidor: ${response.status}`);
         }
         return await response.json();
@@ -355,9 +346,8 @@ const AILabModule = () => {
         throw new Error("Respuesta inválida de la IA.");
       }
     } catch (err) {
-      console.error("Detalle del fallo:", err);
       if (err.message.includes("Error de autenticación")) {
-        setError("Error 401/403: No autorizado. Esto ocurre porque la API Key está vacía o es inválida fuera de Canvas.");
+        setError("Error 401/403: No autorizado. Esto ocurre porque la API Key está vacía o es inválida.");
       } else if (err.message.includes("Error de cliente: 404")) {
          setError(`Error 404: El modelo ${model} no está disponible con esta configuración de API Key.`);
       } else {
@@ -519,12 +509,10 @@ const ClientPortalModule = () => {
     setLoginError('');
     
     try {
-      // Buscamos en la base de datos real
       const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
       const snapshot = await getDocs(clientsRef);
       let foundUser = null;
 
-      // Filtramos en memoria para encontrar al cliente que hace match
       snapshot.forEach(doc => {
         const data = doc.data();
         if (data.email === email && data.password === password) {
@@ -914,7 +902,6 @@ const KeyInsights = () => {
   );
 };
 
-// --- NEW SUCCESS STORIES MODULE ---
 const SuccessStories = () => {
   useScrollReveal();
 
@@ -950,7 +937,6 @@ const SuccessStories = () => {
 
   return (
     <section id="casos-exito" className="py-24 bg-slate-900 border-y border-white/5 relative overflow-hidden">
-      {/* Background flares */}
       <div className="absolute top-1/2 left-0 -translate-y-1/2 w-72 h-72 bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute top-1/2 right-0 -translate-y-1/2 w-72 h-72 bg-cyan-400/10 blur-[120px] rounded-full pointer-events-none" />
       
@@ -973,7 +959,6 @@ const SuccessStories = () => {
               className="group relative bg-slate-950 border border-white/10 rounded-3xl p-8 hover:border-cyan-500/50 transition-all duration-500 reveal-on-scroll opacity-0 translate-y-10 flex flex-col h-full"
               style={{ transitionDelay: `${idx * 150}ms` }}
             >
-              {/* Glow on hover */}
               <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/0 to-cyan-500/5 group-hover:to-cyan-500/10 rounded-3xl transition-colors duration-500 pointer-events-none" />
               
               <div className="relative z-10 flex flex-col h-full">
@@ -1083,20 +1068,24 @@ const CTASection = ({ onOpenModal }) => {
   );
 };
 
-const Footer = ({ onOpenLegal }) => (
+const Footer = ({ onOpenLegal, onOpenAdmin }) => (
   <footer className="bg-slate-950 py-12 border-t border-white/10">
     <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
       <div className="flex items-center gap-2">
         <Scale className="text-slate-500 w-6 h-6" />
         <span className="text-slate-400 font-semibold text-lg">LexNova</span>
       </div>
-      <p className="text-slate-600 text-sm text-center md:text-left">
-        © 2026 LexNova Digital Experiences. Todos los derechos reservados. Diseñado para firmas jurídicas de élite.
+      <p className="text-slate-600 text-sm text-center md:text-left flex-1 md:ml-8">
+        © 2026 LexNova Digital Experiences. Todos los derechos reservados.
       </p>
-      <div className="flex gap-6 text-sm text-slate-500">
+      <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-500">
         <button onClick={() => onOpenLegal('privacidad')} className="hover:text-cyan-400 transition-colors">Privacidad</button>
         <button onClick={() => onOpenLegal('terminos')} className="hover:text-cyan-400 transition-colors">Términos</button>
         <button onClick={() => onOpenLegal('contacto')} className="hover:text-cyan-400 transition-colors">Contacto</button>
+        <span className="text-white/20">|</span>
+        <button onClick={onOpenAdmin} className="hover:text-cyan-400 transition-colors flex items-center gap-1">
+          <ShieldCheck className="w-3 h-3" /> Portal Admin
+        </button>
       </div>
     </div>
   </footer>
@@ -1198,7 +1187,6 @@ const LegalModal = ({ isOpen, onClose, type }) => {
             <h3 className="text-2xl font-bold text-white">{currentContent.title}</h3>
           </div>
           
-          {/* El contenido hace scroll si es muy largo */}
           <div className="max-h-[50vh] overflow-y-auto pr-2">
             {currentContent.body}
           </div>
@@ -1232,7 +1220,6 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
 
     try {
       if (db && user) {
-        // Guardar en la base de datos real (Firestore)
         const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
         await addDoc(leadsRef, {
           ...formData,
@@ -1241,7 +1228,6 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
           estado: 'nuevo_prospecto'
         });
       } else {
-        // Fallback si Firebase no está configurado aún (simulación local)
         await new Promise(resolve => setTimeout(resolve, 1500));
         console.warn("Lead simulado. Configura Firebase en myFirebaseConfig para guardarlo realmente:", formData);
       }
@@ -1251,7 +1237,7 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
         setIsSuccess(false);
         setFormData({ name: '', email: '', phone: '', interest: '' });
         onClose();
-      }, 3000); // Cierra automáticamente el modal después de 3 segundos
+      }, 3000); 
     } catch (error) {
       console.error("Error al guardar el registro:", error);
       setErrorMsg("Error de conexión. Por favor intenta de nuevo.");
@@ -1262,15 +1248,12 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Overlay oscuro para fondo */}
       <div 
         className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
       
-      {/* Contenedor principal del modal */}
       <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl overflow-hidden animate-fade-in-up">
-        {/* Efectos de luz decorativos de fondo */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-400/10 blur-[80px] rounded-full pointer-events-none" />
 
@@ -1404,16 +1387,187 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
   );
 };
 
+// --- NUEVO MÓDULO: PANEL DE ADMINISTRADOR (CRM) ---
+const AdminDashboard = ({ onExit }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passcode === 'lexnova2026') {
+      setIsAuthenticated(true);
+      fetchLeads();
+    } else {
+      setErrorMsg('Contraseña incorrecta.');
+      setPasscode('');
+    }
+  };
+
+  const fetchLeads = async () => {
+    if (!db) return;
+    setLoading(true);
+    try {
+      const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+      const snapshot = await getDocs(leadsRef);
+      const leadsData = [];
+      snapshot.forEach(doc => {
+        leadsData.push({ id: doc.id, ...doc.data() });
+      });
+      // Ordenar por fecha de registro (más reciente primero)
+      leadsData.sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro));
+      setLeads(leadsData);
+    } catch (error) {
+      console.error("Error al obtener leads:", error);
+      setErrorMsg("Error al conectar con la base de datos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-blue-600/5" />
+        <div className="relative w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl animate-fade-in-up z-10">
+          <button onClick={onExit} className="absolute top-4 left-4 text-slate-500 hover:text-white transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="text-center mb-8 mt-4">
+            <div className="w-16 h-16 bg-slate-950 border border-white/10 rounded-2xl mx-auto flex items-center justify-center mb-4">
+              <ShieldCheck className="w-8 h-8 text-cyan-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">Acceso Restringido</h2>
+            <p className="text-sm text-slate-400 mt-2">Área de administración LexNova</p>
+          </div>
+          
+          {errorMsg && <p className="text-red-400 text-sm text-center mb-4 bg-red-400/10 py-2 rounded-lg">{errorMsg}</p>}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input 
+                  type="password" 
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="Contraseña maestra"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                />
+              </div>
+            </div>
+            <button type="submit" className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl hover:bg-slate-200 transition-colors">
+              Desbloquear Panel
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-50 p-6 animate-fade-in">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-white/10 pb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+              <Database className="w-8 h-8 text-cyan-400" />
+              CRM Administrativo
+            </h1>
+            <p className="text-slate-400 mt-2">Gestiona los prospectos generados por tu página web.</p>
+          </div>
+          <div className="flex gap-4">
+            <button onClick={fetchLeads} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
+              <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
+            </button>
+            <button onClick={onExit} className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm hover:bg-red-500/20 transition-colors flex items-center gap-2">
+              <LogOut className="w-4 h-4" /> Salir
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-950/50">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5 text-slate-400" /> 
+              Últimos Prospectos Registrados ({leads.length})
+            </h2>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input type="text" placeholder="Buscar prospecto..." className="bg-slate-900 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-cyan-400 transition-colors" />
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-950/80 border-b border-white/5 text-slate-400">
+                <tr>
+                  <th className="p-4 font-medium">Nombre Completo</th>
+                  <th className="p-4 font-medium">Contacto</th>
+                  <th className="p-4 font-medium">Área de Interés</th>
+                  <th className="p-4 font-medium">Fecha</th>
+                  <th className="p-4 font-medium text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {loading && leads.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="p-8 text-center text-slate-500">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      Cargando datos desde Firebase...
+                    </td>
+                  </tr>
+                ) : leads.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="p-8 text-center text-slate-500">
+                      No hay prospectos registrados todavía.
+                    </td>
+                  </tr>
+                ) : (
+                  leads.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="p-4">
+                        <div className="font-semibold text-white">{lead.name}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-slate-300">{lead.email}</div>
+                        <div className="text-slate-500 text-xs mt-0.5">{lead.phone}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs">
+                          {lead.interest === 'ia-legal' ? 'IA Legal' : lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : 'Case Management'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-400">
+                        {new Date(lead.fechaRegistro).toLocaleDateString()} a las {new Date(lead.fechaRegistro).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="inline-flex w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" title="Nuevo Prospecto"></span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
+  const [currentView, setCurrentView] = useState('landing'); // 'landing' o 'admin'
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [legalModalConfig, setLegalModalConfig] = useState({ isOpen: false, type: 'privacidad' });
   const [user, setUser] = useState(null);
 
-  // Inicializar Autenticación Anónima de Firebase
+  // Inicializar Autenticación
   useEffect(() => {
     if (!auth) return;
-    
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -1425,7 +1579,6 @@ export default function App() {
         console.error("Error de autenticación:", error);
       }
     };
-    
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
@@ -1442,13 +1595,16 @@ export default function App() {
   const scrollTop = () => {
     const container = document.getElementById('main-scroll-container');
     if (container) {
-      container.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
+      container.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
+  // Si el estado es 'admin', renderizamos solo el Dashboard
+  if (currentView === 'admin') {
+    return <AdminDashboard onExit={() => setCurrentView('landing')} />;
+  }
+
+  // De lo contrario, renderizamos la página normal
   return (
     <div 
       id="main-scroll-container"
@@ -1465,7 +1621,12 @@ export default function App() {
       <SuccessStories />
       <ScrollStory />
       <CTASection onOpenModal={() => setIsRegistrationOpen(true)} />
-      <Footer onOpenLegal={(type) => setLegalModalConfig({ isOpen: true, type })} />
+      
+      {/* Pasamos la función para abrir el admin al Footer */}
+      <Footer 
+        onOpenLegal={(type) => setLegalModalConfig({ isOpen: true, type })} 
+        onOpenAdmin={() => setCurrentView('admin')}
+      />
       
       <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} user={user} />
       <LegalModal 
@@ -1474,7 +1635,6 @@ export default function App() {
         onClose={() => setLegalModalConfig({ ...legalModalConfig, isOpen: false })} 
       />
 
-      {/* Botón Flotante: Volver al inicio */}
       <button
         onClick={scrollTop}
         className={`fixed bottom-8 right-8 p-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 rounded-full shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] transition-all duration-500 z-50 group ${
