@@ -38,7 +38,10 @@ import {
   UserPlus,
   FolderOpen,
   MapPin,
-  Calendar
+  Calendar,
+  DollarSign,
+  Paperclip,
+  Plus
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -1561,6 +1564,66 @@ const AdminDashboard = ({ onExit }) => {
     }
   };
 
+  // --- NUEVOS ESTADOS Y FUNCIONES PARA GESTIÓN DE CLIENTE ---
+  const [editingClient, setEditingClient] = useState(null);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [newDocName, setNewDocName] = useState('');
+  const [newTimelineTitle, setNewTimelineTitle] = useState('');
+
+  const openClientDetail = (client) => {
+    // Clonamos el cliente y aseguramos que honorarios exista
+    setEditingClient({ ...client, honorarios: client.honorarios || '' });
+    setIsClientModalOpen(true);
+  };
+
+  const handleAddDocument = () => {
+    if (!newDocName.trim()) return;
+    setEditingClient(prev => ({
+      ...prev,
+      documentos: [
+        ...(prev.documentos || []), 
+        { name: newDocName + '.pdf', date: new Date().toLocaleDateString() }
+      ]
+    }));
+    setNewDocName('');
+  };
+
+  const handleAddTimeline = () => {
+    if (!newTimelineTitle.trim()) return;
+    setEditingClient(prev => ({
+      ...prev,
+      timeline: [
+        ...(prev.timeline || []),
+        { title: newTimelineTitle, date: new Date().toLocaleDateString(), desc: 'Actualización manual administrativa.', done: true }
+      ]
+    }));
+    setNewTimelineTitle('');
+  };
+
+  const saveClientDetails = async (e) => {
+    e.preventDefault();
+    if (!db || !editingClient) return;
+    setLoading(true);
+    try {
+      const clientDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', editingClient.id);
+      const { id, ...dataToSave } = editingClient; // Removemos el id interno antes de guardar
+      await updateDoc(clientDocRef, dataToSave);
+      
+      setSuccessMsg(`¡Expediente de ${editingClient.nombre} actualizado!`);
+      setIsClientModalOpen(false);
+      setEditingClient(null);
+      setTimeout(() => setSuccessMsg(''), 4000);
+      
+      await fetchData(); // Refresca los datos en la tabla principal
+    } catch (error) {
+      console.error("Error actualizando cliente:", error);
+      setErrorMsg("Ocurrió un error al actualizar la ficha del cliente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // -----------------------------------------------------------
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
@@ -1780,7 +1843,7 @@ const AdminDashboard = ({ onExit }) => {
                     <th className="p-4 font-medium">No. Expediente</th>
                     <th className="p-4 font-medium">Estado Procesal</th>
                     <th className="p-4 font-medium">Despacho</th>
-                    <th className="p-4 font-medium text-right">Contraseña Portal</th>
+                    <th className="p-4 font-medium text-right">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -1812,9 +1875,13 @@ const AdminDashboard = ({ onExit }) => {
                           {client.juzgado}
                         </td>
                         <td className="p-4 text-right">
-                          <span className="font-mono text-xs text-slate-500 hover:text-white cursor-pointer px-2 py-1 bg-slate-950 rounded border border-white/5" title="Contraseña generada para el cliente">
-                            {client.password}
-                          </span>
+                          <button 
+                            onClick={() => openClientDetail(client)}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+                          >
+                            <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                            Gestionar Ficha
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -1921,6 +1988,175 @@ const AdminDashboard = ({ onExit }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL GESTIÓN DE CLIENTE EXISTENTE --- */}
+      {isClientModalOpen && editingClient && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsClientModalOpen(false)} />
+          <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
+            
+            <div className="p-6 border-b border-white/10 bg-slate-950/50 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <FolderOpen className="w-5 h-5 text-cyan-400" />
+                  Expediente: {editingClient.nombre}
+                </h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="font-mono text-xs text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{editingClient.expediente}</span>
+                  <span className="text-xs text-slate-400">Cliente desde: {editingClient.fechaInicioContrato}</span>
+                </div>
+              </div>
+              <button onClick={() => setIsClientModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {/* COLUMNA IZQUIERDA: Datos y Administrativo */}
+                <div className="space-y-6">
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-emerald-400" /> Administrativo y Honorarios
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Fijado de Honorarios (COP)</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                          <input 
+                            type="text" 
+                            placeholder="Ej: $ 5.000.000" 
+                            value={editingClient.honorarios} 
+                            onChange={(e) => setEditingClient({...editingClient, honorarios: e.target.value})} 
+                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-cyan-400 focus:outline-none" 
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contraseña del Portal</label>
+                          <input type="text" value={editingClient.password} onChange={(e) => setEditingClient({...editingClient, password: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:border-cyan-400 focus:outline-none font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Tipo de Caso</label>
+                          <input type="text" value={editingClient.tipoCaso} onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-blue-400" /> Estado Procesal
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estado Actual</label>
+                        <input type="text" value={editingClient.estadoActual} onChange={(e) => setEditingClient({...editingClient, estadoActual: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Juzgado Asignado</label>
+                        <input type="text" value={editingClient.juzgado} onChange={(e) => setEditingClient({...editingClient, juzgado: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Próxima Audiencia</label>
+                        <input type="text" value={editingClient.proximaAudiencia} onChange={(e) => setEditingClient({...editingClient, proximaAudiencia: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* COLUMNA DERECHA: Documentos y Línea de Tiempo */}
+                <div className="space-y-6">
+                  {/* Documentos */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <Paperclip className="w-4 h-4 text-cyan-400" /> Documentos Adjuntos
+                    </h4>
+                    
+                    <div className="flex gap-2 mb-4">
+                      <input 
+                        type="text" 
+                        placeholder="Nombre del nuevo documento..." 
+                        value={newDocName}
+                        onChange={(e) => setNewDocName(e.target.value)}
+                        className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" 
+                      />
+                      <button onClick={handleAddDocument} type="button" className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
+                        <Plus className="w-4 h-4" /> Adjuntar
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                      {(!editingClient.documentos || editingClient.documentos.length === 0) && (
+                        <p className="text-xs text-slate-500 italic">No hay documentos adjuntos aún.</p>
+                      )}
+                      {editingClient.documentos?.map((doc, i) => (
+                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
+                            <span className="text-sm text-slate-300 truncate">{doc.name}</span>
+                          </div>
+                          <span className="text-xs text-slate-500 shrink-0 ml-2">{doc.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Línea de Tiempo */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-indigo-400" /> Actuaciones Procesales
+                    </h4>
+                    
+                    <div className="flex gap-2 mb-4">
+                      <input 
+                        type="text" 
+                        placeholder="Nueva actuación procesal..." 
+                        value={newTimelineTitle}
+                        onChange={(e) => setNewTimelineTitle(e.target.value)}
+                        className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-indigo-400 focus:outline-none" 
+                      />
+                      <button onClick={handleAddTimeline} type="button" className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
+                        <Plus className="w-4 h-4" /> Añadir
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                       {(!editingClient.timeline || editingClient.timeline.length === 0) && (
+                        <p className="text-xs text-slate-500 italic">No hay actuaciones registradas.</p>
+                      )}
+                      {editingClient.timeline?.map((step, i) => (
+                        <div key={i} className="flex gap-3">
+                          <div className="w-2 h-2 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                          <div>
+                            <p className="text-sm font-bold text-white leading-tight">{step.title}</p>
+                            <p className="text-xs text-slate-500">{step.date}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-white/10 bg-slate-950/50 flex justify-end gap-3 shrink-0">
+              <button type="button" onClick={() => setIsClientModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors">
+                Cerrar sin guardar
+              </button>
+              <button onClick={saveClientDetails} disabled={loading} className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-cyan-500/25 transition-all flex items-center gap-2">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Guardar Expediente
+              </button>
+            </div>
+
           </div>
         </div>
       )}
