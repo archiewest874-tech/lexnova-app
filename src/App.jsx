@@ -32,7 +32,9 @@ import {
   Menu,
   Users,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  BarChart3,
+  PieChart
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -50,7 +52,6 @@ const myFirebaseConfig = {
 
 // --- AI SETUP ---
 const myAiConfig = {
-  // Tu API Key de Gemini (obtenida en Google AI Studio)
   geminiApiKey: "AIzaSyDl7t0OFQDVbIdRCuFUP4ssEVpl1EedSdI" 
 };
 
@@ -323,7 +324,6 @@ const AILabModule = () => {
         return;
     }
 
-    // Retornamos al modelo más compatible para evitar el error 404
     const model = "gemini-2.5-flash-preview-09-2025"; 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`;
 
@@ -1392,13 +1392,20 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
   );
 };
 
-// --- NUEVO MÓDULO: PANEL DE ADMINISTRADOR (CRM) ---
+// --- MÓDULO DASHBOARD ADMIN MEJORADO ---
 const AdminDashboard = ({ onExit }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // Estados para estadísticas
+  const [stats, setStats] = useState({
+    total: 0,
+    thisWeek: 0,
+    topInterest: '-'
+  });
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -1411,6 +1418,32 @@ const AdminDashboard = ({ onExit }) => {
     }
   };
 
+  const calculateStats = (data) => {
+    const total = data.length;
+    
+    // Calcular prospectos de los últimos 7 días
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const thisWeek = data.filter(lead => new Date(lead.fechaRegistro) > oneWeekAgo).length;
+
+    // Calcular el interés principal
+    const interestCounts = data.reduce((acc, lead) => {
+      acc[lead.interest] = (acc[lead.interest] || 0) + 1;
+      return acc;
+    }, {});
+    
+    let topInterest = 'N/A';
+    let maxCount = 0;
+    for (const [key, value] of Object.entries(interestCounts)) {
+      if (value > maxCount) {
+        maxCount = value;
+        topInterest = key === 'ia-legal' ? 'IA Legal' : key === 'vigilancia' ? 'Vigilancia' : 'Case Mgmt';
+      }
+    }
+
+    setStats({ total, thisWeek, topInterest });
+  };
+
   const fetchLeads = async () => {
     if (!db) return;
     setLoading(true);
@@ -1421,9 +1454,9 @@ const AdminDashboard = ({ onExit }) => {
       snapshot.forEach(doc => {
         leadsData.push({ id: doc.id, ...doc.data() });
       });
-      // Ordenar por fecha de registro (más reciente primero)
       leadsData.sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro));
       setLeads(leadsData);
+      calculateStats(leadsData);
     } catch (error) {
       console.error("Error al obtener leads:", error);
       setErrorMsg("Error al conectar con la base de datos.");
@@ -1479,9 +1512,9 @@ const AdminDashboard = ({ onExit }) => {
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <Database className="w-8 h-8 text-cyan-400" />
-              CRM Administrativo
+              Intelligence Dashboard
             </h1>
-            <p className="text-slate-400 mt-2">Gestiona los prospectos generados por tu página web.</p>
+            <p className="text-slate-400 mt-2">Métricas y gestión de prospectos en tiempo real.</p>
           </div>
           <div className="flex gap-4">
             <button onClick={fetchLeads} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
@@ -1493,15 +1526,49 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         </div>
 
+        {/* --- TARJETAS DE ESTADÍSTICAS (KPIs) --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 blur-2xl rounded-full pointer-events-none" />
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Total Prospectos</p>
+              <Users className="w-5 h-5 text-cyan-400" />
+            </div>
+            <p className="text-4xl font-bold text-white">{stats.total}</p>
+            <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+               Acumulado histórico
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full pointer-events-none" />
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Nuevos (7 Días)</p>
+              <BarChart3 className="w-5 h-5 text-emerald-400" />
+            </div>
+            <p className="text-4xl font-bold text-white">{stats.thisWeek}</p>
+            <p className="text-xs text-emerald-400/80 mt-2 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" /> Tendencia de crecimiento
+            </p>
+          </div>
+
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full pointer-events-none" />
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Servicio Top</p>
+              <PieChart className="w-5 h-5 text-purple-400" />
+            </div>
+            <p className="text-2xl font-bold text-white mt-2">{stats.topInterest}</p>
+            <p className="text-xs text-slate-500 mt-2">Más solicitado</p>
+          </div>
+        </div>
+
         <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-950/50">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Users className="w-5 h-5 text-slate-400" /> 
-              Últimos Prospectos Registrados ({leads.length})
-            </h2>
+          <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-slate-950/50">
+            <h2 className="text-lg font-semibold text-white">Detalle de Registros</h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="text" placeholder="Buscar prospecto..." className="bg-slate-900 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-cyan-400 transition-colors" />
+              <input type="text" placeholder="Buscar por nombre o correo..." className="w-full md:w-64 bg-slate-900 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-cyan-400 transition-colors" />
             </div>
           </div>
           
@@ -1521,13 +1588,13 @@ const AdminDashboard = ({ onExit }) => {
                   <tr>
                     <td colSpan="5" className="p-8 text-center text-slate-500">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                      Cargando datos desde Firebase...
+                      Calculando métricas y cargando datos...
                     </td>
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-8 text-center text-slate-500">
-                      No hay prospectos registrados todavía.
+                      Aún no hay prospectos registrados.
                     </td>
                   </tr>
                 ) : (
@@ -1564,7 +1631,7 @@ const AdminDashboard = ({ onExit }) => {
 };
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('landing'); // 'landing' o 'admin'
+  const [currentView, setCurrentView] = useState('landing'); 
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [legalModalConfig, setLegalModalConfig] = useState({ isOpen: false, type: 'privacidad' });
@@ -1604,12 +1671,10 @@ export default function App() {
     }
   };
 
-  // Si el estado es 'admin', renderizamos solo el Dashboard
   if (currentView === 'admin') {
     return <AdminDashboard onExit={() => setCurrentView('landing')} />;
   }
 
-  // De lo contrario, renderizamos la página normal
   return (
     <div 
       id="main-scroll-container"
@@ -1627,7 +1692,6 @@ export default function App() {
       <ScrollStory />
       <CTASection onOpenModal={() => setIsRegistrationOpen(true)} />
       
-      {/* Pasamos la función para abrir el admin al Footer */}
       <Footer 
         onOpenLegal={(type) => setLegalModalConfig({ isOpen: true, type })} 
         onOpenAdmin={() => setCurrentView('admin')}
