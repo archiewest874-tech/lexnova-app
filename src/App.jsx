@@ -42,7 +42,10 @@ import {
   DollarSign,
   Paperclip,
   Plus,
-  UploadCloud
+  UploadCloud,
+  Clock,
+  UserCheck,
+  Wallet
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -596,6 +599,12 @@ const ClientPortalModule = () => {
         estadoActual: 'Etapa Probatoria',
         proximaAudiencia: '15 Oct, 2026',
         juzgado: '4° Laboral del Circuito',
+        honorarios: '$ 8.000.000',
+        estadoFacturacion: 'Al Día',
+        registroTiempos: [
+          { id: 1, fecha: '05 Sep, 2026', descripcion: 'Estudio de caso y elaboración de demanda', responsable: 'Dr. Carlos Mendoza', horas: 4.5 },
+          { id: 2, fecha: '12 Sep, 2026', descripcion: 'Reunión de estrategia y firma de poder', responsable: 'Ana Gómez (Paralegal)', horas: 1.0 }
+        ],
         documentosRequeridos: [
           { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: true, fecha: '10 Ago, 2026' },
           { id: 'req2', nombre: 'Poder Autenticado', subido: true, fecha: '10 Ago, 2026' },
@@ -624,6 +633,9 @@ const ClientPortalModule = () => {
   const reqDocs = clientData?.documentosRequeridos || [];
   const completedDocs = reqDocs.filter(r => r.subido).length;
   const docsProgress = reqDocs.length ? Math.round((completedDocs / reqDocs.length) * 100) : 0;
+
+  // Total de horas invertidas
+  const horasTotales = (clientData?.registroTiempos || []).reduce((sum, entry) => sum + Number(entry.horas), 0);
 
   return (
     <section id="portal-cliente" className="py-24 bg-slate-950 relative overflow-hidden">
@@ -718,7 +730,7 @@ const ClientPortalModule = () => {
                 {[
                   { id: 'resumen', icon: <Activity className="w-4 h-4" />, label: 'Resumen del Caso' },
                   { id: 'documentos', icon: <FileText className="w-4 h-4" />, label: 'Documentos' },
-                  { id: 'facturacion', icon: <CreditCard className="w-4 h-4" />, label: 'Facturación' },
+                  { id: 'facturacion', icon: <CreditCard className="w-4 h-4" />, label: 'Facturación y Tiempos' },
                   { id: 'mensajes', icon: <MessageSquare className="w-4 h-4" />, label: 'Mensajes' },
                 ].map((item) => (
                   <button
@@ -896,10 +908,76 @@ const ClientPortalModule = () => {
               )}
 
               {activeTab === 'facturacion' && (
-                <div className="flex flex-col items-center justify-center py-12 animate-fade-in text-center">
-                  <CreditCard className="w-16 h-16 text-slate-700 mb-4" />
-                  <h4 className="text-xl font-bold text-white mb-2">Al Día</h4>
-                  <p className="text-slate-400">No tienes facturas pendientes de pago.</p>
+                <div className="animate-fade-in space-y-6">
+                  {/* Resumen Financiero y Horas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 blur-xl rounded-full pointer-events-none" />
+                      <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5"/> Honorarios Totales</p>
+                      <p className="text-xl font-bold text-white mt-2">
+                        {clientData?.honorarios || <span className="text-slate-500 text-sm italic">Por definir</span>}
+                      </p>
+                    </div>
+                    <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+                      <div className={`absolute top-0 right-0 w-16 h-16 blur-xl rounded-full pointer-events-none ${clientData?.estadoFacturacion === 'En Mora' ? 'bg-red-500/10' : clientData?.estadoFacturacion === 'Pendiente' ? 'bg-yellow-500/10' : 'bg-emerald-500/10'}`} />
+                      <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5"/> Estado de Cuenta</p>
+                      <div className="mt-2">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          clientData?.estadoFacturacion === 'En Mora' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+                          clientData?.estadoFacturacion === 'Pendiente' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 
+                          'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        }`}>
+                          {clientData?.estadoFacturacion || 'Al Día'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 blur-xl rounded-full pointer-events-none" />
+                      <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5"/> Horas de Equipo</p>
+                      <p className="text-xl font-bold text-blue-400 mt-2">{horasTotales.toFixed(1)} <span className="text-sm font-medium text-slate-500">hrs</span></p>
+                    </div>
+                  </div>
+
+                  {/* Tabla de Tiempos y Tareas */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
+                    <div className="p-5 border-b border-white/5 bg-slate-950/30">
+                      <h4 className="text-white font-bold">Registro de Actividades y Tiempos Invertidos</h4>
+                      <p className="text-xs text-slate-400 mt-1">Transparencia total sobre el trabajo realizado en tu expediente.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-950/50 border-b border-white/5 text-slate-400">
+                          <tr>
+                            <th className="p-4 font-medium">Fecha</th>
+                            <th className="p-4 font-medium">Descripción de Tarea</th>
+                            <th className="p-4 font-medium">Responsable</th>
+                            <th className="p-4 font-medium text-right">Horas</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-slate-300">
+                          {(!clientData?.registroTiempos || clientData.registroTiempos.length === 0) ? (
+                            <tr><td colSpan="4" className="p-6 text-center text-slate-500">Aún no hay registros de tiempo en este expediente.</td></tr>
+                          ) : (
+                            clientData.registroTiempos.map((entry, i) => (
+                              <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                <td className="p-4 whitespace-nowrap">{entry.fecha}</td>
+                                <td className="p-4">
+                                  <span className="text-white font-medium block">{entry.descripcion}</span>
+                                </td>
+                                <td className="p-4">
+                                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900 px-2 py-1 rounded border border-white/5 whitespace-nowrap">
+                                    <UserCheck className="w-3 h-3 text-indigo-400" />
+                                    {entry.responsable}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-right font-mono text-cyan-400">{Number(entry.horas).toFixed(1)}h</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1544,7 +1622,7 @@ const AdminDashboard = ({ onExit }) => {
     telefono: '',
     direccion: '',
     tipoCaso: '',
-    fechaInicio: new Date().toISOString().split('T')[0] // Fecha actual por defecto YYYY-MM-DD
+    fechaInicio: new Date().toISOString().split('T')[0]
   });
 
   const handleLogin = (e) => {
@@ -1585,7 +1663,6 @@ const AdminDashboard = ({ onExit }) => {
     const activeCases = data.filter(c => c.estadoActual && !c.estadoActual.toLowerCase().includes('cerrado')).length;
     const nextHearings = data.filter(c => c.proximaAudiencia && !c.proximaAudiencia.toLowerCase().includes('pendiente')).length;
     
-    // Sumar todos los honorarios extraídos como números limpios
     const totalHonorarios = data.reduce((sum, c) => {
       const valText = (c.honorarios || '').toString();
       const valNum = Number(valText.replace(/[^0-9]/g, ''));
@@ -1599,7 +1676,6 @@ const AdminDashboard = ({ onExit }) => {
     if (!db) return;
     setLoading(true);
     try {
-      // 1. Obtener Leads
       const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
       const leadsSnap = await getDocs(leadsRef);
       const leadsData = [];
@@ -1608,7 +1684,6 @@ const AdminDashboard = ({ onExit }) => {
       setLeads(leadsData);
       calculateLeadsStats(leadsData);
 
-      // 2. Obtener Clientes
       const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
       const clientsSnap = await getDocs(clientsRef);
       const clientsData = [];
@@ -1624,10 +1699,8 @@ const AdminDashboard = ({ onExit }) => {
     }
   };
 
-  // Abrir la ficha de ingreso al hacer clic en convertir
   const openConversionModal = (lead) => {
     setLeadToConvert(lead);
-    // Pre-llenar los datos que ya tenemos del Lead
     setConversionData({
       nombres: lead.name || '',
       cedula: '',
@@ -1640,7 +1713,6 @@ const AdminDashboard = ({ onExit }) => {
     setIsConversionModalOpen(true);
   };
 
-  // Procesar la creación real del cliente desde el formulario
   const submitConversion = async (e) => {
     e.preventDefault();
     if (!db || !leadToConvert) return;
@@ -1648,24 +1720,25 @@ const AdminDashboard = ({ onExit }) => {
     setErrorMsg('');
     
     try {
-      // 1. Crear un nuevo Cliente en Firebase con los datos ampliados
       const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
       const newExpediente = `#${Math.floor(Math.random() * 9000) + 1000}-${conversionData.tipoCaso.substring(0,3).toUpperCase()}`;
       
       await addDoc(clientsRef, {
         email: conversionData.email,
-        password: 'lexnova' + Math.floor(Math.random() * 1000), // Contraseña auto-generada
+        password: 'lexnova' + Math.floor(Math.random() * 1000), 
         nombre: conversionData.nombres,
         cedula: conversionData.cedula,
         telefono: conversionData.telefono,
         direccion: conversionData.direccion,
         tipoCaso: conversionData.tipoCaso,
-        fechaInicioContrato: conversionData.fechaInicio, // Dato clave para métricas futuras
-        honorarios: '', // Se inicializa vacío para llenarlo después en Ficha
+        fechaInicioContrato: conversionData.fechaInicio, 
+        honorarios: '', 
+        estadoFacturacion: 'Pendiente',
         expediente: newExpediente,
         estadoActual: 'Estudio Inicial',
         proximaAudiencia: 'Pendiente de fijación',
         juzgado: 'Por Asignar',
+        registroTiempos: [], // Inicializa array de tiempos
         documentosRequeridos: [
           { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: false, fecha: '' },
           { id: 'req2', nombre: 'Poder Firmado o Autenticado', subido: false, fecha: '' },
@@ -1678,7 +1751,6 @@ const AdminDashboard = ({ onExit }) => {
         documentos: []
       });
 
-      // 2. Marcar el Lead original como convertido
       const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadToConvert.id);
       await updateDoc(leadDocRef, { estado: 'convertido' });
 
@@ -1687,7 +1759,7 @@ const AdminDashboard = ({ onExit }) => {
       setLeadToConvert(null);
       setTimeout(() => setSuccessMsg(''), 4000);
       
-      await fetchData(); // Refrescar las tablas
+      await fetchData();
     } catch (error) {
       console.error("Error en conversión:", error);
       setErrorMsg("Ocurrió un error al guardar la ficha del cliente.");
@@ -1696,15 +1768,23 @@ const AdminDashboard = ({ onExit }) => {
     }
   };
 
-  // --- NUEVOS ESTADOS Y FUNCIONES PARA GESTIÓN DE CLIENTE ---
+  // --- GESTIÓN DE CLIENTE EXISTENTE (FICHA MAESTRA) ---
   const [editingClient, setEditingClient] = useState(null);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clientModalTab, setClientModalTab] = useState('general'); // 'general', 'docs', 'erp'
+  
   const [newDocName, setNewDocName] = useState('');
   const [newTimelineTitle, setNewTimelineTitle] = useState('');
+  const [newTimeEntry, setNewTimeEntry] = useState({ fecha: new Date().toISOString().split('T')[0], descripcion: '', responsable: '', horas: '' });
 
   const openClientDetail = (client) => {
-    // Clonamos el cliente y aseguramos que honorarios exista
-    setEditingClient({ ...client, honorarios: client.honorarios || '' });
+    setEditingClient({ 
+      ...client, 
+      honorarios: client.honorarios || '',
+      estadoFacturacion: client.estadoFacturacion || 'Al Día',
+      registroTiempos: client.registroTiempos || []
+    });
+    setClientModalTab('general');
     setIsClientModalOpen(true);
   };
 
@@ -1712,10 +1792,7 @@ const AdminDashboard = ({ onExit }) => {
     if (!newDocName.trim()) return;
     setEditingClient(prev => ({
       ...prev,
-      documentos: [
-        ...(prev.documentos || []), 
-        { name: newDocName + '.pdf', date: new Date().toLocaleDateString() }
-      ]
+      documentos: [ ...(prev.documentos || []), { name: newDocName + '.pdf', date: new Date().toLocaleDateString() } ]
     }));
     setNewDocName('');
   };
@@ -1724,12 +1801,21 @@ const AdminDashboard = ({ onExit }) => {
     if (!newTimelineTitle.trim()) return;
     setEditingClient(prev => ({
       ...prev,
-      timeline: [
-        ...(prev.timeline || []),
-        { title: newTimelineTitle, date: new Date().toLocaleDateString(), desc: 'Actualización manual administrativa.', done: true }
-      ]
+      timeline: [ ...(prev.timeline || []), { title: newTimelineTitle, date: new Date().toLocaleDateString(), desc: 'Actualización procesal manual.', done: true } ]
     }));
     setNewTimelineTitle('');
+  };
+
+  const handleAddTimeEntry = () => {
+    if (!newTimeEntry.descripcion || !newTimeEntry.responsable || !newTimeEntry.horas) return;
+    setEditingClient(prev => ({
+      ...prev,
+      registroTiempos: [
+        ...(prev.registroTiempos || []),
+        { ...newTimeEntry, id: Date.now() }
+      ]
+    }));
+    setNewTimeEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', responsable: '', horas: '' });
   };
 
   const saveClientDetails = async (e) => {
@@ -1738,7 +1824,7 @@ const AdminDashboard = ({ onExit }) => {
     setLoading(true);
     try {
       const clientDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', editingClient.id);
-      const { id, ...dataToSave } = editingClient; // Removemos el id interno antes de guardar
+      const { id, ...dataToSave } = editingClient; 
       await updateDoc(clientDocRef, dataToSave);
       
       setSuccessMsg(`¡Expediente de ${editingClient.nombre} actualizado!`);
@@ -1746,7 +1832,7 @@ const AdminDashboard = ({ onExit }) => {
       setEditingClient(null);
       setTimeout(() => setSuccessMsg(''), 4000);
       
-      await fetchData(); // Refresca los datos en la tabla principal
+      await fetchData(); 
     } catch (error) {
       console.error("Error actualizando cliente:", error);
       setErrorMsg("Ocurrió un error al actualizar la ficha del cliente.");
@@ -1754,7 +1840,6 @@ const AdminDashboard = ({ onExit }) => {
       setLoading(false);
     }
   };
-  // -----------------------------------------------------------
 
   if (!isAuthenticated) {
     return (
@@ -1817,7 +1902,6 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         </div>
 
-        {/* Notificación de Éxito al Convertir */}
         {successMsg && (
           <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 flex items-center gap-3 animate-fade-in-down">
             <CheckCircle2 className="w-5 h-5" />
@@ -1825,7 +1909,6 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         )}
 
-        {/* TABS DE NAVEGACIÓN */}
         <div className="flex bg-slate-900 p-1.5 rounded-xl mb-8 w-fit border border-white/10 shadow-lg">
           <button
             onClick={() => setViewMode('leads')}
@@ -1843,7 +1926,7 @@ const AdminDashboard = ({ onExit }) => {
           </button>
         </div>
 
-        {/* --- TARJETAS DE ESTADÍSTICAS (Dependen del ViewMode) --- */}
+        {/* --- TARJETAS DE ESTADÍSTICAS --- */}
         {viewMode === 'leads' ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in">
             <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
@@ -1917,7 +2000,7 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         )}
 
-        {/* --- TABLAS (Dependen del ViewMode) --- */}
+        {/* --- TABLAS --- */}
         <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
           <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-slate-950/50">
             <h2 className="text-lg font-semibold text-white">
@@ -2043,7 +2126,7 @@ const AdminDashboard = ({ onExit }) => {
         </div>
       </div>
 
-      {/* --- MODAL FICHA DE INGRESO --- */}
+      {/* --- MODAL FICHA DE INGRESO (CONVERSIÓN) --- */}
       {isConversionModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsConversionModalOpen(false)} />
@@ -2064,7 +2147,6 @@ const AdminDashboard = ({ onExit }) => {
 
             <form onSubmit={submitConversion} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Nombres */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Nombres y Apellidos</label>
                   <div className="relative">
@@ -2072,8 +2154,6 @@ const AdminDashboard = ({ onExit }) => {
                     <input required type="text" value={conversionData.nombres} onChange={(e) => setConversionData({...conversionData, nombres: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                   </div>
                 </div>
-                
-                {/* Cédula */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Cédula de Ciudadanía / NIT</label>
                   <div className="relative">
@@ -2081,8 +2161,6 @@ const AdminDashboard = ({ onExit }) => {
                     <input required type="text" placeholder="Ej: 1020304050" value={conversionData.cedula} onChange={(e) => setConversionData({...conversionData, cedula: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                   </div>
                 </div>
-
-                {/* Email */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Correo Electrónico</label>
                   <div className="relative">
@@ -2090,8 +2168,6 @@ const AdminDashboard = ({ onExit }) => {
                     <input required type="email" value={conversionData.email} onChange={(e) => setConversionData({...conversionData, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                   </div>
                 </div>
-
-                {/* Teléfono */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Teléfono Celular</label>
                   <div className="relative">
@@ -2099,8 +2175,6 @@ const AdminDashboard = ({ onExit }) => {
                     <input required type="tel" value={conversionData.telefono} onChange={(e) => setConversionData({...conversionData, telefono: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                   </div>
                 </div>
-
-                {/* Dirección */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Dirección de Notificación / Residencia</label>
                   <div className="relative">
@@ -2108,8 +2182,6 @@ const AdminDashboard = ({ onExit }) => {
                     <input required type="text" placeholder="Ej: Cra 12 # 34 - 56, Bogotá" value={conversionData.direccion} onChange={(e) => setConversionData({...conversionData, direccion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                   </div>
                 </div>
-
-                {/* Tipo de Caso */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Naturaleza del Caso</label>
                   <div className="relative">
@@ -2117,8 +2189,6 @@ const AdminDashboard = ({ onExit }) => {
                     <input required type="text" value={conversionData.tipoCaso} onChange={(e) => setConversionData({...conversionData, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                   </div>
                 </div>
-
-                {/* Fecha Inicio Contrato */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Fecha Inicio de Contrato</label>
                   <div className="relative">
@@ -2142,11 +2212,11 @@ const AdminDashboard = ({ onExit }) => {
         </div>
       )}
 
-      {/* --- MODAL GESTIÓN DE CLIENTE EXISTENTE --- */}
+      {/* --- MODAL GESTIÓN DE CLIENTE EXISTENTE (TABS) --- */}
       {isClientModalOpen && editingClient && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsClientModalOpen(false)} />
-          <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
+          <div className="relative w-full max-w-5xl max-h-[95vh] flex flex-col bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
             
             <div className="p-6 border-b border-white/10 bg-slate-950/50 flex justify-between items-center shrink-0">
               <div>
@@ -2154,151 +2224,85 @@ const AdminDashboard = ({ onExit }) => {
                   <FolderOpen className="w-5 h-5 text-cyan-400" />
                   Expediente: {editingClient.nombre}
                 </h3>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-3 mt-2">
                   <span className="font-mono text-xs text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{editingClient.expediente}</span>
                   <span className="text-xs text-slate-400">Cliente desde: {editingClient.fechaInicioContrato}</span>
                 </div>
               </div>
               <button onClick={() => setIsClientModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* COLUMNA IZQUIERDA: Datos y Administrativo */}
-                <div className="space-y-6">
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-emerald-400" /> Administrativo y Honorarios
-                    </h4>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Fijado de Honorarios (COP)</label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                          <input 
-                            type="text" 
-                            placeholder="Ej: $ 5.000.000" 
-                            value={editingClient.honorarios} 
-                            onChange={(e) => setEditingClient({...editingClient, honorarios: e.target.value})} 
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-cyan-400 focus:outline-none" 
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contraseña del Portal</label>
-                          <input type="text" value={editingClient.password} onChange={(e) => setEditingClient({...editingClient, password: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:border-cyan-400 focus:outline-none font-mono" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Tipo de Caso</label>
-                          <input type="text" value={editingClient.tipoCaso} onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            {/* Pestañas de Navegación del Modal */}
+            <div className="flex border-b border-white/10 bg-slate-950/30 px-6 shrink-0">
+              {[
+                { id: 'general', label: 'Resumen Legal', icon: <Briefcase className="w-4 h-4"/> },
+                { id: 'docs', label: 'Documental', icon: <Paperclip className="w-4 h-4"/> },
+                { id: 'erp', label: 'ERP & Operación', icon: <Activity className="w-4 h-4"/> }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setClientModalTab(tab.id)}
+                  className={`px-5 py-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-colors ${clientModalTab === tab.id ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
 
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                      <Briefcase className="w-4 h-4 text-blue-400" /> Estado Procesal
-                    </h4>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estado Actual</label>
-                        <input type="text" value={editingClient.estadoActual} onChange={(e) => setEditingClient({...editingClient, estadoActual: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Juzgado Asignado</label>
-                        <input type="text" value={editingClient.juzgado} onChange={(e) => setEditingClient({...editingClient, juzgado: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Próxima Audiencia</label>
-                        <input type="text" value={editingClient.proximaAudiencia} onChange={(e) => setEditingClient({...editingClient, proximaAudiencia: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* COLUMNA DERECHA: Documentos y Línea de Tiempo */}
-                <div className="space-y-6">
-                  
-                  {/* Visor del Checklist Inicial */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-3 uppercase tracking-wider flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Checklist de Ingreso (Vista Admin)
-                    </h4>
-                    <div className="space-y-2">
-                      {(!editingClient.documentosRequeridos || editingClient.documentosRequeridos.length === 0) && (
-                        <p className="text-xs text-slate-500 italic">No hay requisitos de ingreso definidos.</p>
-                      )}
-                      {editingClient.documentosRequeridos?.map(req => (
-                         <div key={req.id} className="flex justify-between items-center text-sm p-2 bg-slate-950/30 rounded border border-white/5">
-                            <span className={req.subido ? "text-slate-500 line-through truncate" : "text-slate-200 truncate"}>{req.nombre}</span>
-                            <span className={`shrink-0 ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${req.subido ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-400"}`}>
-                              {req.subido ? 'Recibido' : 'Pendiente'}
-                            </span>
-                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Documentos */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                      <Paperclip className="w-4 h-4 text-cyan-400" /> Documentos Adjuntos
-                    </h4>
-                    
-                    <div className="flex gap-2 mb-4">
-                      <input 
-                        type="text" 
-                        placeholder="Nombre del nuevo documento..." 
-                        value={newDocName}
-                        onChange={(e) => setNewDocName(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" 
-                      />
-                      <button onClick={handleAddDocument} type="button" className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
-                        <Plus className="w-4 h-4" /> Adjuntar
-                      </button>
-                    </div>
-
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                      {(!editingClient.documentos || editingClient.documentos.length === 0) && (
-                        <p className="text-xs text-slate-500 italic">No hay documentos adjuntos aún.</p>
-                      )}
-                      {editingClient.documentos?.map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
-                            <span className="text-sm text-slate-300 truncate">{doc.name}</span>
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-900/50">
+              
+              {/* TAB 1: RESUMEN LEGAL */}
+              {clientModalTab === 'general' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                  <div className="space-y-6">
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Datos Básicos</h4>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contraseña del Portal</label>
+                            <input type="text" value={editingClient.password} onChange={(e) => setEditingClient({...editingClient, password: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:border-cyan-400 focus:outline-none font-mono" />
                           </div>
-                          <span className="text-xs text-slate-500 shrink-0 ml-2">{doc.date}</span>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Tipo de Caso</label>
+                            <input type="text" value={editingClient.tipoCaso} onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                          </div>
                         </div>
-                      ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Estado Procesal</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estado Actual</label>
+                          <input type="text" value={editingClient.estadoActual} onChange={(e) => setEditingClient({...editingClient, estadoActual: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Juzgado Asignado</label>
+                          <input type="text" value={editingClient.juzgado} onChange={(e) => setEditingClient({...editingClient, juzgado: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Próxima Audiencia</label>
+                          <input type="text" value={editingClient.proximaAudiencia} onChange={(e) => setEditingClient({...editingClient, proximaAudiencia: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Línea de Tiempo */}
-                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5 flex flex-col">
                     <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-indigo-400" /> Actuaciones Procesales
+                      <Activity className="w-4 h-4 text-indigo-400" /> Actuaciones Procesales (Timeline)
                     </h4>
-                    
                     <div className="flex gap-2 mb-4">
-                      <input 
-                        type="text" 
-                        placeholder="Nueva actuación procesal..." 
-                        value={newTimelineTitle}
-                        onChange={(e) => setNewTimelineTitle(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-indigo-400 focus:outline-none" 
-                      />
+                      <input type="text" placeholder="Nueva actuación procesal..." value={newTimelineTitle} onChange={(e) => setNewTimelineTitle(e.target.value)} className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
                       <button onClick={handleAddTimeline} type="button" className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
                         <Plus className="w-4 h-4" /> Añadir
                       </button>
                     </div>
-
-                    <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                    <div className="space-y-3 overflow-y-auto pr-2 flex-1">
                        {(!editingClient.timeline || editingClient.timeline.length === 0) && (
                         <p className="text-xs text-slate-500 italic">No hay actuaciones registradas.</p>
                       )}
@@ -2313,9 +2317,184 @@ const AdminDashboard = ({ onExit }) => {
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* TAB 2: DOCUMENTAL */}
+              {clientModalTab === 'docs' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-3 uppercase tracking-wider flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Checklist de Ingreso
+                    </h4>
+                    <div className="space-y-2">
+                      {(!editingClient.documentosRequeridos || editingClient.documentosRequeridos.length === 0) && (
+                        <p className="text-xs text-slate-500 italic">No hay requisitos de ingreso definidos.</p>
+                      )}
+                      {editingClient.documentosRequeridos?.map(req => (
+                         <div key={req.id} className="flex justify-between items-center text-sm p-3 bg-slate-950/30 rounded border border-white/5">
+                            <span className={req.subido ? "text-slate-500 line-through truncate" : "text-slate-200 truncate"}>{req.nombre}</span>
+                            <span className={`shrink-0 ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${req.subido ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-400"}`}>
+                              {req.subido ? 'Recibido' : 'Pendiente'}
+                            </span>
+                         </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <Paperclip className="w-4 h-4 text-cyan-400" /> Repositorio General
+                    </h4>
+                    <div className="flex gap-2 mb-4">
+                      <input type="text" placeholder="Nombre del nuevo documento..." value={newDocName} onChange={(e) => setNewDocName(e.target.value)} className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      <button onClick={handleAddDocument} type="button" className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
+                        <Plus className="w-4 h-4" /> Adjuntar
+                      </button>
+                    </div>
+                    <div className="space-y-2 overflow-y-auto pr-2">
+                      {(!editingClient.documentos || editingClient.documentos.length === 0) && (
+                        <p className="text-xs text-slate-500 italic">No hay documentos adjuntos aún.</p>
+                      )}
+                      {editingClient.documentos?.map((doc, i) => (
+                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
+                            <span className="text-sm text-slate-300 truncate">{doc.name}</span>
+                          </div>
+                          <span className="text-xs text-slate-500 shrink-0 ml-2">{doc.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: ERP & OPERACIÓN */}
+              {clientModalTab === 'erp' && (
+                <div className="space-y-8 animate-fade-in">
+                  
+                  {/* Tarjetas Financieras */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-emerald-400" /> Pacto de Honorarios
+                      </h4>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Total (COP)</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                          <input 
+                            type="text" 
+                            placeholder="Ej: $ 5.000.000" 
+                            value={editingClient.honorarios} 
+                            onChange={(e) => setEditingClient({...editingClient, honorarios: e.target.value})} 
+                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-emerald-400 focus:outline-none font-bold text-emerald-400" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-yellow-400" /> Estado de Facturación
+                      </h4>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estatus Actual</label>
+                        <div className="relative">
+                          <select 
+                            value={editingClient.estadoFacturacion || 'Al Día'} 
+                            onChange={(e) => setEditingClient({...editingClient, estadoFacturacion: e.target.value})} 
+                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-3 pr-10 text-sm text-white focus:border-yellow-400 focus:outline-none appearance-none cursor-pointer"
+                          >
+                            <option value="Al Día">Al Día (Pagado)</option>
+                            <option value="Pendiente">Pendiente de Cobro</option>
+                            <option value="En Mora">En Mora</option>
+                          </select>
+                          <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 rotate-90 pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Registro de Tiempos */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
+                    <div className="p-5 border-b border-white/5 bg-slate-950/30 flex justify-between items-center">
+                      <div>
+                        <h4 className="text-white font-bold flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-blue-400" /> Registro de Tiempos y Tareas
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-1">Lleva el control de horas facturables invertidas por tu equipo.</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-blue-400">
+                          {editingClient.registroTiempos?.reduce((sum, t) => sum + Number(t.horas), 0).toFixed(1) || '0.0'}
+                        </p>
+                        <p className="text-xs text-slate-500">Horas totales</p>
+                      </div>
+                    </div>
+                    
+                    {/* Formulario de nuevo tiempo */}
+                    <div className="p-4 bg-slate-900/50 border-b border-white/5 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Fecha</label>
+                        <input type="date" value={newTimeEntry.fecha} onChange={e => setNewTimeEntry({...newTimeEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" />
+                      </div>
+                      <div className="md:col-span-5">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Tarea Realizada</label>
+                        <input type="text" placeholder="Ej: Redacción de tutela..." value={newTimeEntry.descripcion} onChange={e => setNewTimeEntry({...newTimeEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Responsable</label>
+                        <input type="text" placeholder="Ej: Dr. Gómez" value={newTimeEntry.responsable} onChange={e => setNewTimeEntry({...newTimeEntry, responsable: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Hrs</label>
+                        <input type="number" step="0.1" min="0" placeholder="1.5" value={newTimeEntry.horas} onChange={e => setNewTimeEntry({...newTimeEntry, horas: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-center" />
+                      </div>
+                      <div className="md:col-span-1">
+                        <button onClick={handleAddTimeEntry} type="button" className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition-colors h-[30px]">
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Tabla de tiempos */}
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-950/80 sticky top-0 text-slate-400 text-xs">
+                          <tr>
+                            <th className="p-3 font-medium">Fecha</th>
+                            <th className="p-3 font-medium">Descripción</th>
+                            <th className="p-3 font-medium">Responsable</th>
+                            <th className="p-3 font-medium text-right">Horas</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-slate-300">
+                          {(!editingClient.registroTiempos || editingClient.registroTiempos.length === 0) ? (
+                            <tr><td colSpan="4" className="p-6 text-center text-xs text-slate-500">No hay registros de tiempo todavía.</td></tr>
+                          ) : (
+                            editingClient.registroTiempos.map((entry) => (
+                              <tr key={entry.id} className="hover:bg-white/[0.02]">
+                                <td className="p-3 text-xs">{entry.fecha}</td>
+                                <td className="p-3 text-sm">{entry.descripcion}</td>
+                                <td className="p-3">
+                                  <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-white/5">
+                                    <UserCheck className="w-3 h-3 text-indigo-400" />
+                                    {entry.responsable}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono text-cyan-400">{Number(entry.horas).toFixed(1)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
 
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-white/10 bg-slate-950/50 flex justify-end gap-3 shrink-0">
