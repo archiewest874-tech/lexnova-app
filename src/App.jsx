@@ -50,7 +50,7 @@ const myFirebaseConfig = {
 
 // --- AI SETUP ---
 const myAiConfig = {
-  // Pega aquí tu API Key de Gemini (obtenida en Google AI Studio)
+  // Tu API Key de Gemini (obtenida en Google AI Studio)
   geminiApiKey: "AIzaSyDl7t0OFQDVbIdRCuFUP4ssEVpl1EedSdI" 
 };
 
@@ -315,7 +315,6 @@ const AILabModule = () => {
     setError('');
     setResult(null);
 
-    // Usamos la configuración directa
     const activeApiKey = myAiConfig.geminiApiKey; 
     
     if (!activeApiKey) {
@@ -324,7 +323,8 @@ const AILabModule = () => {
         return;
     }
 
-    const model = "gemini-1.5-flash"; // Usamos un modelo más estable y rápido para producción
+    // Retornamos al modelo más compatible para evitar el error 404
+    const model = "gemini-2.5-flash-preview-09-2025"; 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`;
 
     const systemPrompt = `Actúa como un abogado experto y analista legal de una firma top. Analiza los hechos o el caso legal proporcionado. 
