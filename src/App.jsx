@@ -41,7 +41,8 @@ import {
   Calendar,
   DollarSign,
   Paperclip,
-  Plus
+  Plus,
+  UploadCloud
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -504,6 +505,7 @@ const ClientPortalModule = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [uploadingDocId, setUploadingDocId] = useState(null);
   
   const [email, setEmail] = useState('cliente@ejemplo.com');
   const [password, setPassword] = useState('123456');
@@ -546,6 +548,40 @@ const ClientPortalModule = () => {
     }
   };
 
+  const handleSimulateUpload = async (reqId, reqNombre) => {
+    if (!db || !clientData) return;
+    setUploadingDocId(reqId);
+    
+    try {
+      // 1. Marcar como subido en la lista de requeridos
+      const updatedReqs = (clientData.documentosRequeridos || []).map(req =>
+        req.id === reqId ? { ...req, subido: true, fecha: new Date().toLocaleDateString() } : req
+      );
+      
+      // 2. Añadir al repositorio general
+      const newDoc = { name: reqNombre + '.pdf', date: new Date().toLocaleDateString() };
+      const updatedDocs = [...(clientData.documentos || []), newDoc];
+
+      // 3. Guardar en base de datos
+      const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', clientData.id);
+      await updateDoc(clientRef, {
+        documentosRequeridos: updatedReqs,
+        documentos: updatedDocs
+      });
+
+      // 4. Actualizar vista local
+      setClientData({ 
+        ...clientData, 
+        documentosRequeridos: updatedReqs, 
+        documentos: updatedDocs 
+      });
+    } catch(err) {
+      console.error("Error subiendo documento:", err);
+    } finally {
+      setUploadingDocId(null);
+    }
+  };
+
   const generateDemoUser = async () => {
     if (!db) return;
     setLoginLoading(true);
@@ -560,6 +596,12 @@ const ClientPortalModule = () => {
         estadoActual: 'Etapa Probatoria',
         proximaAudiencia: '15 Oct, 2026',
         juzgado: '4° Laboral del Circuito',
+        documentosRequeridos: [
+          { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: true, fecha: '10 Ago, 2026' },
+          { id: 'req2', nombre: 'Poder Autenticado', subido: true, fecha: '10 Ago, 2026' },
+          { id: 'req3', nombre: 'Contrato de Honorarios Firmado', subido: false },
+          { id: 'req4', nombre: 'Certificado de Existencia y Representación', subido: false }
+        ],
         timeline: [
           { title: 'Admisión de Demanda', date: '01 Sep, 2026', desc: 'Notificación personal realizada.', done: true },
           { title: 'Contestación de Demanda', date: '15 Sep, 2026', desc: 'La contraparte allegó respuesta y excepciones.', done: true },
@@ -567,8 +609,7 @@ const ClientPortalModule = () => {
         ],
         documentos: [
           { name: 'Poder Firmado.pdf', date: '10 Ago, 2026' },
-          { name: 'Demanda Laboral Radicada.pdf', date: '01 Sep, 2026' },
-          { name: 'Auto Admisorio Juzgado 4.pdf', date: '05 Sep, 2026' }
+          { name: 'Copia Cédula.pdf', date: '10 Ago, 2026' }
         ]
       };
       await addDoc(clientsRef, demoData);
@@ -578,6 +619,11 @@ const ClientPortalModule = () => {
     }
     setLoginLoading(false);
   };
+
+  // Cálculos para la lista de chequeo
+  const reqDocs = clientData?.documentosRequeridos || [];
+  const completedDocs = reqDocs.filter(r => r.subido).length;
+  const docsProgress = reqDocs.length ? Math.round((completedDocs / reqDocs.length) * 100) : 0;
 
   return (
     <section id="portal-cliente" className="py-24 bg-slate-950 relative overflow-hidden">
@@ -618,7 +664,7 @@ const ClientPortalModule = () => {
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
                   />
                 </div>
               </div>
@@ -630,7 +676,7 @@ const ClientPortalModule = () => {
                     type="password" 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
                   />
                 </div>
               </div>
@@ -691,7 +737,7 @@ const ClientPortalModule = () => {
               </nav>
 
               <button 
-                onClick={() => { setIsLoggedIn(false); setClientData(null); }}
+                onClick={() => { setIsLoggedIn(false); setClientData(null); setActiveTab('resumen'); }}
                 className="mt-8 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-400/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
@@ -748,32 +794,104 @@ const ClientPortalModule = () => {
               )}
 
               {activeTab === 'documentos' && (
-                <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden animate-fade-in">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-950/50 border-b border-white/5 text-slate-400">
-                      <tr>
-                        <th className="p-4 font-medium">Nombre del Documento</th>
-                        <th className="p-4 font-medium hidden sm:table-cell">Fecha</th>
-                        <th className="p-4 font-medium text-right">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5 text-slate-300">
-                      {clientData?.documentos?.map((doc, i) => (
-                        <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="p-4 flex items-center gap-3">
-                            <FileText className="w-4 h-4 text-cyan-400" />
-                            {doc.name}
-                          </td>
-                          <td className="p-4 hidden sm:table-cell">{doc.date}</td>
-                          <td className="p-4 text-right">
-                            <button className="text-cyan-400 hover:text-white transition-colors p-2 bg-cyan-400/10 rounded-lg">
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </td>
+                <div className="animate-fade-in space-y-8">
+                  {/* CHECKLIST SECTION */}
+                  {reqDocs.length > 0 && (
+                    <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-6">
+                      <div className="flex justify-between items-end mb-3">
+                        <div>
+                          <h4 className="text-white font-bold text-lg">Requisitos de Ingreso</h4>
+                          <p className="text-xs text-slate-400">Aporta la documentación inicial para habilitar tu caso.</p>
+                        </div>
+                        <span className="text-2xl font-bold text-cyan-400">{docsProgress}%</span>
+                      </div>
+                      
+                      <div className="w-full bg-slate-900 rounded-full h-2 mb-6 border border-white/5">
+                        <div className="bg-cyan-400 h-2 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(34,211,238,0.5)]" style={{width: `${docsProgress}%`}}></div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {reqDocs.map(req => (
+                          <div key={req.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                            <div className="flex items-center gap-3">
+                              {req.subido ? (
+                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                </div>
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
+                                  <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                                </div>
+                              )}
+                              <div>
+                                <p className={`text-sm ${req.subido ? 'text-slate-400 line-through' : 'text-white font-medium'}`}>{req.nombre}</p>
+                                {req.subido && <p className="text-[10px] text-emerald-400 mt-0.5">Recibido: {req.fecha}</p>}
+                              </div>
+                            </div>
+                            
+                            {!req.subido && (
+                              <button 
+                                onClick={() => handleSimulateUpload(req.id, req.nombre)}
+                                disabled={uploadingDocId === req.id}
+                                className="text-xs px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                              >
+                                {uploadingDocId === req.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                                Subir
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {docsProgress === 100 && (
+                        <div className="mt-5 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-emerald-400">
+                          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold">¡Expediente Documental Completo!</p>
+                            <p className="text-xs text-emerald-400/80">Has aportado toda la información inicial. Nuestro equipo ya está trabajando en tu caso.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* REPOSITORIO GENERAL SECTION */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
+                    <div className="p-5 border-b border-white/5 bg-slate-950/30">
+                      <h4 className="text-white font-bold">Repositorio General de Expediente</h4>
+                    </div>
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-950/50 border-b border-white/5 text-slate-400">
+                        <tr>
+                          <th className="p-4 font-medium">Nombre del Documento</th>
+                          <th className="p-4 font-medium hidden sm:table-cell">Fecha</th>
+                          <th className="p-4 font-medium text-right">Acción</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-slate-300">
+                        {(!clientData?.documentos || clientData.documentos.length === 0) ? (
+                          <tr><td colSpan="3" className="p-6 text-center text-slate-500">No hay documentos en el repositorio.</td></tr>
+                        ) : (
+                          clientData.documentos.map((doc, i) => (
+                            <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                              <td className="p-4 flex items-center gap-3">
+                                <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
+                                {doc.name}
+                              </td>
+                              <td className="p-4 hidden sm:table-cell">{doc.date}</td>
+                              <td className="p-4 text-right">
+                                <button className="text-cyan-400 hover:text-white transition-colors p-2 bg-cyan-400/10 rounded-lg">
+                                  <Download className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
@@ -1548,6 +1666,11 @@ const AdminDashboard = ({ onExit }) => {
         estadoActual: 'Estudio Inicial',
         proximaAudiencia: 'Pendiente de fijación',
         juzgado: 'Por Asignar',
+        documentosRequeridos: [
+          { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: false, fecha: '' },
+          { id: 'req2', nombre: 'Poder Firmado o Autenticado', subido: false, fecha: '' },
+          { id: 'req3', nombre: 'Documentación Probatoria Base', subido: false, fecha: '' }
+        ],
         timeline: [
           { title: 'Firma de Contrato', date: conversionData.fechaInicio, desc: 'Inicio formal de la relación comercial e ingreso al sistema.', done: true },
           { title: 'Recepción de Documentos', date: 'Pendiente', desc: 'A la espera de anexos y poderes para iniciar gestión.', done: false }
@@ -2100,6 +2223,27 @@ const AdminDashboard = ({ onExit }) => {
 
                 {/* COLUMNA DERECHA: Documentos y Línea de Tiempo */}
                 <div className="space-y-6">
+                  
+                  {/* Visor del Checklist Inicial */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-3 uppercase tracking-wider flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Checklist de Ingreso (Vista Admin)
+                    </h4>
+                    <div className="space-y-2">
+                      {(!editingClient.documentosRequeridos || editingClient.documentosRequeridos.length === 0) && (
+                        <p className="text-xs text-slate-500 italic">No hay requisitos de ingreso definidos.</p>
+                      )}
+                      {editingClient.documentosRequeridos?.map(req => (
+                         <div key={req.id} className="flex justify-between items-center text-sm p-2 bg-slate-950/30 rounded border border-white/5">
+                            <span className={req.subido ? "text-slate-500 line-through truncate" : "text-slate-200 truncate"}>{req.nombre}</span>
+                            <span className={`shrink-0 ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${req.subido ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-400"}`}>
+                              {req.subido ? 'Recibido' : 'Pendiente'}
+                            </span>
+                         </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Documentos */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                     <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
