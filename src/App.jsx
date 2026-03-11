@@ -163,12 +163,12 @@ const Hero = ({ onOpenModal }) => {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-400/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
       
       <div className="max-w-5xl mx-auto px-6 text-center relative z-10">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-cyan-400 text-sm font-medium mb-8 animate-fade-in-down">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-cyan-400 text-sm font-medium mb-10 animate-fade-in-down">
           <Zap className="w-4 h-4" />
           <span>El futuro del litigio y la gestión legal</span>
         </div>
         
-        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-tight leading-tight mb-8">
+        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-tight leading-tight mb-12 pb-2">
           Transformación Digital <br className="hidden md:block"/> para el Abogado Moderno.
         </h1>
         
@@ -946,7 +946,7 @@ const ScrollStory = () => {
   );
 };
 
-const CTASection = () => {
+const CTASection = ({ onOpenModal }) => {
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="absolute inset-0 bg-blue-600/5" />
@@ -960,7 +960,10 @@ const CTASection = () => {
         <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto">
           Únete a la nueva era del Derecho. Centraliza tu despacho, asegura tu información y eleva el nivel de tu servicio a estándares internacionales.
         </p>
-        <button className="px-10 py-5 bg-white text-slate-950 hover:bg-slate-200 rounded-full font-bold text-lg transition-all flex items-center gap-3 mx-auto group shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+        <button 
+          onClick={onOpenModal}
+          className="px-10 py-5 bg-white text-slate-950 hover:bg-slate-200 rounded-full font-bold text-lg transition-all flex items-center gap-3 mx-auto group shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+        >
           Solicitar Demostración Gratuita
           <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
         </button>
@@ -969,7 +972,7 @@ const CTASection = () => {
   );
 };
 
-const Footer = () => (
+const Footer = ({ onOpenLegal }) => (
   <footer className="bg-slate-950 py-12 border-t border-white/10">
     <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
       <div className="flex items-center gap-2">
@@ -980,13 +983,128 @@ const Footer = () => (
         © 2026 LexNova Digital Experiences. Todos los derechos reservados. Diseñado para firmas jurídicas de élite.
       </p>
       <div className="flex gap-6 text-sm text-slate-500">
-        <a href="#" className="hover:text-cyan-400 transition-colors">Privacidad</a>
-        <a href="#" className="hover:text-cyan-400 transition-colors">Términos</a>
-        <a href="#" className="hover:text-cyan-400 transition-colors">Contacto</a>
+        <button onClick={() => onOpenLegal('privacidad')} className="hover:text-cyan-400 transition-colors">Privacidad</button>
+        <button onClick={() => onOpenLegal('terminos')} className="hover:text-cyan-400 transition-colors">Términos</button>
+        <button onClick={() => onOpenLegal('contacto')} className="hover:text-cyan-400 transition-colors">Contacto</button>
       </div>
     </div>
   </footer>
 );
+
+const LegalModal = ({ isOpen, onClose, type }) => {
+  if (!isOpen) return null;
+
+  const content = {
+    privacidad: {
+      title: "Política de Privacidad",
+      icon: <ShieldCheck className="w-6 h-6 text-cyan-400" />,
+      body: (
+        <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
+          <p><strong>1. Tratamiento de Datos Personales</strong><br/>De conformidad con la Ley 1581 de 2012 y el Decreto 1377 de 2013 de la República de Colombia, LexNova garantiza la protección, confidencialidad y seguridad de los datos personales de nuestros usuarios y los de sus clientes.</p>
+          <p><strong>2. Finalidad de la Información</strong><br/>La información recopilada se utilizará exclusivamente para el acceso a la plataforma, notificaciones procesales automatizadas, y gestión de facturación, manteniendo el estricto secreto profesional abogado-cliente.</p>
+          <p><strong>3. Seguridad y Mensajes de Datos</strong><br/>Implementamos encriptación de nivel militar y protocolos de seguridad bajo los estándares de la Ley 527 de 1999, garantizando la inalterabilidad y validez probatoria de la información alojada.</p>
+          <p><strong>4. Derechos del Titular</strong><br/>Usted tiene derecho a conocer, actualizar, rectificar y solicitar la eliminación de sus datos en cualquier momento escribiendo a nuestro oficial de privacidad en <span className="text-cyan-400">privacidad@lexnova.com</span>.</p>
+        </div>
+      )
+    },
+    terminos: {
+      title: "Términos y Condiciones",
+      icon: <FileText className="w-6 h-6 text-cyan-400" />,
+      body: (
+        <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
+          <p><strong>1. Aceptación del Acuerdo</strong><br/>Al acceder, navegar y utilizar la plataforma LexNova, usted acepta estar legalmente sujeto a estos Términos y Condiciones de uso (SaaS Legal).</p>
+          <p><strong>2. Uso Permitido de la Plataforma</strong><br/>LexNova está diseñada exclusivamente para la gestión de procesos legales, control de expedientes y administración de firmas jurídicas. Queda estrictamente prohibido su uso para fines ilícitos o de ingeniería inversa.</p>
+          <p><strong>3. Acuerdos de Nivel de Servicio (SLA)</strong><br/>LexNova se esfuerza por mantener una disponibilidad del 99.9%. Sin embargo, no nos hacemos responsables por la indisponibilidad derivada de fallas en los sistemas propios de la Rama Judicial u otras entidades gubernamentales conectadas.</p>
+          <p><strong>4. Propiedad Intelectual</strong><br/>El código fuente, los algoritmos de Inteligencia Artificial, el diseño de la interfaz y la marca registrada son propiedad exclusiva de LexNova Digital Experiences.</p>
+        </div>
+      )
+    },
+    contacto: {
+      title: "Contacto y Soporte",
+      icon: <MessageSquare className="w-6 h-6 text-cyan-400" />,
+      body: (
+        <div className="space-y-6 text-slate-300 text-sm">
+          <p>¿Tienes dudas técnicas, necesitas soporte con la integración de tu firma o deseas reportar un incidente? Nuestro equipo de ingenieros y especialistas legales está listo para ayudarte.</p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                <Phone className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Línea de Atención Nacional</p>
+                <p className="text-slate-400">+57 300 123 4567</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/30">
+                <MessageSquare className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Soporte Técnico y Ayuda</p>
+                <p className="text-slate-400">soporte@lexnova.com</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                <Briefcase className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Oficinas Corporativas</p>
+                <p className="text-slate-400">Edificio Business Center, Piso 12, Bogotá, Colombia.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  };
+
+  const currentContent = content[type] || content['privacidad'];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div 
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+      
+      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl overflow-hidden animate-fade-in-up">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-400/10 blur-[80px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none" />
+        
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors z-10"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center shadow-inner">
+              {currentContent.icon}
+            </div>
+            <h3 className="text-2xl font-bold text-white">{currentContent.title}</h3>
+          </div>
+          
+          {/* El contenido hace scroll si es muy largo */}
+          <div className="max-h-[50vh] overflow-y-auto pr-2">
+            {currentContent.body}
+          </div>
+          
+          <div className="mt-8 pt-6 border-t border-white/10 flex justify-end">
+            <button 
+              onClick={onClose} 
+              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all flex items-center gap-2"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const RegistrationModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', interest: '' });
@@ -1150,6 +1268,7 @@ const RegistrationModal = ({ isOpen, onClose }) => {
 export default function App() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [legalModalConfig, setLegalModalConfig] = useState({ isOpen: false, type: 'privacidad' });
 
   const handleScrollVisibility = (e) => {
     if (e.currentTarget.scrollTop > 400) {
@@ -1184,10 +1303,15 @@ export default function App() {
       <KeyInsights />
       <SuccessStories />
       <ScrollStory />
-      <CTASection />
-      <Footer />
+      <CTASection onOpenModal={() => setIsRegistrationOpen(true)} />
+      <Footer onOpenLegal={(type) => setLegalModalConfig({ isOpen: true, type })} />
       
       <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} />
+      <LegalModal 
+        isOpen={legalModalConfig.isOpen} 
+        type={legalModalConfig.type} 
+        onClose={() => setLegalModalConfig({ ...legalModalConfig, isOpen: false })} 
+      />
 
       {/* Botón Flotante: Volver al inicio */}
       <button
