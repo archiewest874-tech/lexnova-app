@@ -36,7 +36,9 @@ import {
   BarChart3,
   PieChart,
   UserPlus,
-  FolderOpen
+  FolderOpen,
+  MapPin,
+  Calendar
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -1411,6 +1413,19 @@ const AdminDashboard = ({ onExit }) => {
   const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
   const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0 });
 
+  // Estados para el Modal de Conversión (Ficha de Ingreso)
+  const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
+  const [leadToConvert, setLeadToConvert] = useState(null);
+  const [conversionData, setConversionData] = useState({
+    nombres: '',
+    cedula: '',
+    email: '',
+    telefono: '',
+    direccion: '',
+    tipoCaso: '',
+    fechaInicio: new Date().toISOString().split('T')[0] // Fecha actual por defecto YYYY-MM-DD
+  });
+
   const handleLogin = (e) => {
     e.preventDefault();
     if (passcode === 'lexnova2026') {
@@ -1480,42 +1495,67 @@ const AdminDashboard = ({ onExit }) => {
     }
   };
 
-  // Función Mágica para convertir Prospecto en Cliente
-  const handleConvertToClient = async (lead) => {
-    if (!db) return;
+  // Abrir la ficha de ingreso al hacer clic en convertir
+  const openConversionModal = (lead) => {
+    setLeadToConvert(lead);
+    // Pre-llenar los datos que ya tenemos del Lead
+    setConversionData({
+      nombres: lead.name || '',
+      cedula: '',
+      email: lead.email || '',
+      telefono: lead.phone || '',
+      direccion: '',
+      tipoCaso: lead.interest === 'ia-legal' ? 'Asesoría IA Legal' : (lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : 'Representación Litigiosa'),
+      fechaInicio: new Date().toISOString().split('T')[0]
+    });
+    setIsConversionModalOpen(true);
+  };
+
+  // Procesar la creación real del cliente desde el formulario
+  const submitConversion = async (e) => {
+    e.preventDefault();
+    if (!db || !leadToConvert) return;
     setLoading(true);
     setErrorMsg('');
+    
     try {
-      // 1. Crear un nuevo Cliente en Firebase
+      // 1. Crear un nuevo Cliente en Firebase con los datos ampliados
       const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
-      const newExpediente = `#${Math.floor(Math.random() * 9000) + 1000}-${lead.interest === 'ia-legal' ? 'IAL' : 'LIT'}`;
+      const newExpediente = `#${Math.floor(Math.random() * 9000) + 1000}-${conversionData.tipoCaso.substring(0,3).toUpperCase()}`;
       
       await addDoc(clientsRef, {
-        email: lead.email,
+        email: conversionData.email,
         password: 'lexnova' + Math.floor(Math.random() * 1000), // Contraseña auto-generada
-        nombre: lead.name,
+        nombre: conversionData.nombres,
+        cedula: conversionData.cedula,
+        telefono: conversionData.telefono,
+        direccion: conversionData.direccion,
+        tipoCaso: conversionData.tipoCaso,
+        fechaInicioContrato: conversionData.fechaInicio, // Dato clave para métricas futuras
         expediente: newExpediente,
         estadoActual: 'Estudio Inicial',
         proximaAudiencia: 'Pendiente de fijación',
         juzgado: 'Por Asignar',
         timeline: [
-          { title: 'Recepción de Caso', date: new Date().toLocaleDateString(), desc: 'Prospecto convertido desde sitio web.', done: true },
-          { title: 'Firma de Poder', date: 'Pendiente', desc: 'A la espera de formalización.', done: false }
+          { title: 'Firma de Contrato', date: conversionData.fechaInicio, desc: 'Inicio formal de la relación comercial e ingreso al sistema.', done: true },
+          { title: 'Recepción de Documentos', date: 'Pendiente', desc: 'A la espera de anexos y poderes para iniciar gestión.', done: false }
         ],
         documentos: []
       });
 
       // 2. Marcar el Lead original como convertido
-      const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', lead.id);
+      const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadToConvert.id);
       await updateDoc(leadDocRef, { estado: 'convertido' });
 
-      setSuccessMsg(`¡${lead.name} convertido a Cliente exitosamente!`);
+      setSuccessMsg(`¡Ficha creada! ${conversionData.nombres} es ahora un cliente activo.`);
+      setIsConversionModalOpen(false);
+      setLeadToConvert(null);
       setTimeout(() => setSuccessMsg(''), 4000);
       
       await fetchData(); // Refrescar las tablas
     } catch (error) {
       console.error("Error en conversión:", error);
-      setErrorMsg("No se pudo convertir al cliente.");
+      setErrorMsg("Ocurrió un error al guardar la ficha del cliente.");
     } finally {
       setLoading(false);
     }
@@ -1562,7 +1602,7 @@ const AdminDashboard = ({ onExit }) => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 p-6 animate-fade-in">
+    <div className="min-h-screen bg-slate-950 text-slate-50 p-6 animate-fade-in relative">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-white/10 pb-6">
           <div>
@@ -1720,7 +1760,7 @@ const AdminDashboard = ({ onExit }) => {
                         </td>
                         <td className="p-4 text-right">
                           <button 
-                            onClick={() => handleConvertToClient(lead)}
+                            onClick={() => openConversionModal(lead)}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-lg shadow-indigo-500/20"
                           >
                             <UserPlus className="w-3.5 h-3.5" />
@@ -1753,10 +1793,15 @@ const AdminDashboard = ({ onExit }) => {
                       <tr key={client.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="p-4">
                           <div className="font-semibold text-white">{client.nombre}</div>
-                          <div className="text-slate-500 text-xs mt-0.5">{client.email}</div>
+                          <div className="text-slate-500 text-xs mt-0.5 flex gap-2">
+                             <span>CC: {client.cedula || 'N/A'}</span> • <span>{client.telefono || 'N/A'}</span>
+                          </div>
                         </td>
-                        <td className="p-4 font-mono text-xs text-indigo-300 bg-indigo-500/5 rounded px-2 py-1 inline-block mt-2">
-                          {client.expediente}
+                        <td className="p-4">
+                          <span className="font-mono text-xs text-indigo-300 bg-indigo-500/5 border border-indigo-500/20 rounded px-2 py-1 inline-block">
+                            {client.expediente}
+                          </span>
+                          <div className="text-xs text-slate-500 mt-1">Inicio: {client.fechaInicioContrato}</div>
                         </td>
                         <td className="p-4">
                           <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 rounded-full text-xs">
@@ -1780,6 +1825,105 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         </div>
       </div>
+
+      {/* --- MODAL FICHA DE INGRESO --- */}
+      {isConversionModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsConversionModalOpen(false)} />
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
+            
+            <div className="p-6 border-b border-white/10 bg-slate-950/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-indigo-400" />
+                  Ficha de Ingreso: Nuevo Cliente
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">Completa los datos administrativos para habilitar su expediente.</p>
+              </div>
+              <button onClick={() => setIsConversionModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={submitConversion} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Nombres */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Nombres y Apellidos</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="text" value={conversionData.nombres} onChange={(e) => setConversionData({...conversionData, nombres: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+                  </div>
+                </div>
+                
+                {/* Cédula */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Cédula de Ciudadanía / NIT</label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="text" placeholder="Ej: 1020304050" value={conversionData.cedula} onChange={(e) => setConversionData({...conversionData, cedula: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Correo Electrónico</label>
+                  <div className="relative">
+                    <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="email" value={conversionData.email} onChange={(e) => setConversionData({...conversionData, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+                  </div>
+                </div>
+
+                {/* Teléfono */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Teléfono Celular</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="tel" value={conversionData.telefono} onChange={(e) => setConversionData({...conversionData, telefono: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+                  </div>
+                </div>
+
+                {/* Dirección */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Dirección de Notificación / Residencia</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="text" placeholder="Ej: Cra 12 # 34 - 56, Bogotá" value={conversionData.direccion} onChange={(e) => setConversionData({...conversionData, direccion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+                  </div>
+                </div>
+
+                {/* Tipo de Caso */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Naturaleza del Caso</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="text" value={conversionData.tipoCaso} onChange={(e) => setConversionData({...conversionData, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
+                  </div>
+                </div>
+
+                {/* Fecha Inicio Contrato */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Fecha Inicio de Contrato</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input required type="date" value={conversionData.fechaInicio} onChange={(e) => setConversionData({...conversionData, fechaInicio: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none [color-scheme:dark]" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 mt-2 border-t border-white/10 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsConversionModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={loading} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-2">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Formalizar Ingreso
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
