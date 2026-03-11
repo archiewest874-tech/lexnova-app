@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
 // Si estás en Vercel/Local, reemplaza este objeto con la configuración de tu proyecto de Firebase (Firestore).
@@ -502,14 +502,81 @@ const ClientPortalModule = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
   const [loginLoading, setLoginLoading] = useState(false);
+  
+  const [email, setEmail] = useState('cliente@ejemplo.com');
+  const [password, setPassword] = useState('123456');
+  const [clientData, setClientData] = useState(null);
+  const [loginError, setLoginError] = useState('');
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    if (!db) {
+      setLoginError("Base de datos no conectada.");
+      return;
+    }
+    
     setLoginLoading(true);
-    setTimeout(() => {
+    setLoginError('');
+    
+    try {
+      // Buscamos en la base de datos real
+      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+      const snapshot = await getDocs(clientsRef);
+      let foundUser = null;
+
+      // Filtramos en memoria para encontrar al cliente que hace match
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.email === email && data.password === password) {
+          foundUser = { id: doc.id, ...data };
+        }
+      });
+
+      if (foundUser) {
+        setClientData(foundUser);
+        setIsLoggedIn(true);
+      } else {
+        setLoginError('Credenciales incorrectas o usuario no encontrado.');
+      }
+    } catch (err) {
+      console.error("Error consultando Firebase:", err);
+      setLoginError('Error de conexión con la base de datos.');
+    } finally {
       setLoginLoading(false);
-      setIsLoggedIn(true);
-    }, 1500); 
+    }
+  };
+
+  const generateDemoUser = async () => {
+    if (!db) return;
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+      const demoData = {
+        email: 'cliente@ejemplo.com',
+        password: '123456',
+        nombre: 'Juan Pérez (Firebase Demo)',
+        expediente: '#4892-LAB',
+        estadoActual: 'Etapa Probatoria',
+        proximaAudiencia: '15 Oct, 2026',
+        juzgado: '4° Laboral del Circuito',
+        timeline: [
+          { title: 'Admisión de Demanda', date: '01 Sep, 2026', desc: 'Notificación personal realizada.', done: true },
+          { title: 'Contestación de Demanda', date: '15 Sep, 2026', desc: 'La contraparte allegó respuesta y excepciones.', done: true },
+          { title: 'Fijación de Audiencia Inicial', date: 'Pendiente', desc: 'A la espera de auto admisorio para fijar fecha.', done: false }
+        ],
+        documentos: [
+          { name: 'Poder Firmado.pdf', date: '10 Ago, 2026' },
+          { name: 'Demanda Laboral Radicada.pdf', date: '01 Sep, 2026' },
+          { name: 'Auto Admisorio Juzgado 4.pdf', date: '05 Sep, 2026' }
+        ]
+      };
+      await addDoc(clientsRef, demoData);
+      setLoginError('¡Usuario Demo creado en Firebase! Ahora haz clic en Ingresar.');
+    } catch (err) {
+      setLoginError('Error creando el demo: ' + err.message);
+    }
+    setLoginLoading(false);
   };
 
   return (
@@ -536,19 +603,35 @@ const ClientPortalModule = () => {
               <p className="text-sm text-slate-400 mt-2">Ingresa tus credenciales para ver tu expediente</p>
             </div>
 
+            {loginError && (
+              <div className={`mb-4 p-3 rounded-xl text-sm ${loginError.includes('creado') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {loginError}
+              </div>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Correo Electrónico</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                  <input type="email" defaultValue="cliente@ejemplo.com" className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" />
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                  />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Contraseña</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                  <input type="password" defaultValue="********" className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" />
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                  />
                 </div>
               </div>
               <button 
@@ -559,6 +642,17 @@ const ClientPortalModule = () => {
                 {loginLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ingresar al Portal'}
               </button>
             </form>
+
+            <div className="mt-6 pt-6 border-t border-white/10 text-center">
+              <p className="text-xs text-slate-500 mb-3">¿No tienes usuarios de prueba en Firebase?</p>
+              <button 
+                onClick={generateDemoUser}
+                disabled={loginLoading}
+                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex items-center justify-center gap-1 mx-auto"
+              >
+                <Database className="w-3 h-3" /> Generar Usuario Demo en BD
+              </button>
+            </div>
           </div>
         ) : (
           <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up flex flex-col md:flex-row">
@@ -569,8 +663,8 @@ const ClientPortalModule = () => {
                   <User className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white">Juan Pérez</p>
-                  <p className="text-xs text-slate-500">Expediente #4892</p>
+                  <p className="text-sm font-bold text-white">{clientData?.nombre || 'Cliente'}</p>
+                  <p className="text-xs text-slate-500">Expediente {clientData?.expediente}</p>
                 </div>
               </div>
 
@@ -597,7 +691,7 @@ const ClientPortalModule = () => {
               </nav>
 
               <button 
-                onClick={() => setIsLoggedIn(false)}
+                onClick={() => { setIsLoggedIn(false); setClientData(null); }}
                 className="mt-8 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-400/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
@@ -617,30 +711,26 @@ const ClientPortalModule = () => {
               </div>
 
               {activeTab === 'resumen' && (
-                <div className="space-y-6 animate-fade-in">
+               <div className="space-y-6 animate-fade-in">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                       <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Estado Actual</p>
-                      <p className="text-lg font-bold text-emerald-400">Etapa Probatoria</p>
+                      <p className="text-lg font-bold text-emerald-400">{clientData?.estadoActual}</p>
                     </div>
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                       <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Próxima Audiencia</p>
-                      <p className="text-lg font-bold text-white flex items-center gap-2"><CalendarCheck className="w-4 h-4 text-cyan-400"/> 15 Oct, 2026</p>
+                      <p className="text-lg font-bold text-white flex items-center gap-2"><CalendarCheck className="w-4 h-4 text-cyan-400"/> {clientData?.proximaAudiencia}</p>
                     </div>
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                       <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Juzgado Asignado</p>
-                      <p className="text-lg font-bold text-white">4° Laboral del Circuito</p>
+                      <p className="text-lg font-bold text-white">{clientData?.juzgado}</p>
                     </div>
                   </div>
 
                   <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-6">
                     <h4 className="text-white font-semibold mb-6">Línea de Tiempo del Proceso</h4>
                     <div className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-cyan-500 before:via-slate-700 before:to-transparent">
-                      {[
-                        { title: 'Admisión de Demanda', date: '01 Sep, 2026', desc: 'Notificación personal realizada.', done: true },
-                        { title: 'Contestación de Demanda', date: '15 Sep, 2026', desc: 'La contraparte allegó respuesta y excepciones.', done: true },
-                        { title: 'Fijación de Audiencia Inicial', date: 'Pendiente', desc: 'A la espera de auto admisorio para fijar fecha.', done: false },
-                      ].map((step, i) => (
+                      {clientData?.timeline?.map((step, i) => (
                         <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                           <div className={`flex items-center justify-center w-6 h-6 rounded-full border-4 border-slate-900 ${step.done ? 'bg-cyan-400' : 'bg-slate-700'} text-slate-900 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow`} />
                           <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-white/5 bg-white/5">
@@ -668,11 +758,7 @@ const ClientPortalModule = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5 text-slate-300">
-                      {[
-                        { name: 'Poder Firmado.pdf', date: '10 Ago, 2026' },
-                        { name: 'Demanda Laboral Radicada.pdf', date: '01 Sep, 2026' },
-                        { name: 'Auto Admisorio Juzgado 4.pdf', date: '05 Sep, 2026' },
-                      ].map((doc, i) => (
+                      {clientData?.documentos?.map((doc, i) => (
                         <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                           <td className="p-4 flex items-center gap-3">
                             <FileText className="w-4 h-4 text-cyan-400" />
