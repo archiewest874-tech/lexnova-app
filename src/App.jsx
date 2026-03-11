@@ -74,6 +74,19 @@ const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
 
+// --- Funciones Globales de Formato (COP) ---
+const formatCOP = (val) => {
+  if (!val) return '';
+  const num = Number(val.toString().replace(/[^0-9]/g, ''));
+  if (isNaN(num) || num === 0) return '$ 0';
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
+};
+
+const parseCOP = (val) => {
+  if (!val) return 0;
+  return Number(val.toString().replace(/[^0-9]/g, ''));
+};
+
 // --- Custom Hooks for Animations ---
 const useScrollReveal = () => {
   useEffect(() => {
@@ -611,6 +624,10 @@ const ClientPortalModule = () => {
           { id: 'req3', nombre: 'Contrato de Honorarios Firmado', subido: false },
           { id: 'req4', nombre: 'Certificado de Existencia y Representación', subido: false }
         ],
+        planPagos: [
+          { id: 1, fecha: '01 Sep, 2026', descripcion: '50% Anticipo inicial', monto: '4000000' },
+          { id: 2, fecha: '01 Dic, 2026', descripcion: '50% Contra sentencia', monto: '4000000' }
+        ],
         pagos: [
           { id: 1, fecha: '10 Sep, 2026', descripcion: 'Anticipo inicial (50%)', monto: '4000000' }
         ],
@@ -636,6 +653,11 @@ const ClientPortalModule = () => {
   const reqDocs = clientData?.documentosRequeridos || [];
   const completedDocs = reqDocs.filter(r => r.subido).length;
   const docsProgress = reqDocs.length ? Math.round((completedDocs / reqDocs.length) * 100) : 0;
+
+  // Cálculos financieros
+  const honorariosNum = parseCOP(clientData?.honorarios);
+  const recaudoNum = (clientData?.pagos || []).reduce((sum, p) => sum + parseCOP(p.monto), 0);
+  const saldoPendienteNum = honorariosNum - recaudoNum;
 
   // Total de horas invertidas
   const horasTotales = (clientData?.registroTiempos || []).reduce((sum, entry) => sum + Number(entry.horas), 0);
@@ -913,19 +935,26 @@ const ClientPortalModule = () => {
               {activeTab === 'facturacion' && (
                 <div className="animate-fade-in space-y-6">
                   {/* Resumen Financiero y Horas */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 blur-xl rounded-full pointer-events-none" />
                       <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5"/> Honorarios Totales</p>
                       <p className="text-xl font-bold text-white mt-2">
-                        {clientData?.honorarios || <span className="text-slate-500 text-sm italic">Por definir</span>}
+                        {clientData?.honorarios ? formatCOP(clientData.honorarios) : <span className="text-slate-500 text-sm italic">Por definir</span>}
                       </p>
                     </div>
                     <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/10 blur-xl rounded-full pointer-events-none" />
-                      <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5"/> Total Abonado</p>
+                      <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5"/> Efectivamente Pagado</p>
                       <p className="text-xl font-bold text-cyan-400 mt-2">
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format((clientData?.pagos || []).reduce((sum, p) => sum + Number((p.monto || '').toString().replace(/[^0-9]/g, '')), 0))}
+                        {formatCOP(recaudoNum)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-500/10 blur-xl rounded-full pointer-events-none" />
+                      <p className="text-xs text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5"/> Saldo Pendiente</p>
+                      <p className="text-xl font-bold text-yellow-400 mt-2">
+                        {formatCOP(saldoPendienteNum)}
                       </p>
                     </div>
                     <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-5 relative overflow-hidden">
@@ -942,6 +971,38 @@ const ClientPortalModule = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Plan de Pagos Acordado (Vista Cliente) */}
+                  {clientData?.planPagos && clientData.planPagos.length > 0 && (
+                  <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden mt-6">
+                    <div className="p-5 border-b border-white/5 bg-slate-950/30">
+                      <h4 className="text-white font-bold">Plan de Pagos Acordado</h4>
+                      <p className="text-xs text-slate-400 mt-1">Hitos y fechas establecidas en tu contrato de prestación de servicios.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-950/50 border-b border-white/5 text-slate-400">
+                          <tr>
+                            <th className="p-4 font-medium">Fecha Esperada</th>
+                            <th className="p-4 font-medium">Descripción / Hito</th>
+                            <th className="p-4 font-medium text-right">Monto a Pagar</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-slate-300">
+                          {clientData.planPagos.map((plan, i) => (
+                            <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                              <td className="p-4 whitespace-nowrap">{plan.fecha}</td>
+                              <td className="p-4"><span className="text-white font-medium block">{plan.descripcion}</span></td>
+                              <td className="p-4 text-right font-mono text-purple-400">
+                                {formatCOP(plan.monto)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  )}
 
                   {/* Tabla de Pagos */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
@@ -969,7 +1030,7 @@ const ClientPortalModule = () => {
                                   <span className="text-white font-medium block">{pago.descripcion}</span>
                                 </td>
                                 <td className="p-4 text-right font-mono text-cyan-400">
-                                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number((pago.monto || '').toString().replace(/[^0-9]/g, '')))}
+                                  {formatCOP(pago.monto)}
                                 </td>
                               </tr>
                             ))
@@ -1651,7 +1712,7 @@ const AdminDashboard = ({ onExit }) => {
   
   // KPI States
   const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
-  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0, totalHonorarios: 0, totalRecaudo: 0 });
+  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0, totalHonorarios: 0, totalRecaudo: 0, saldoPendiente: 0 });
 
   // Estados para el Modal de Conversión (Ficha de Ingreso)
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
@@ -1704,19 +1765,17 @@ const AdminDashboard = ({ onExit }) => {
     const activeCases = data.filter(c => c.estadoActual && !c.estadoActual.toLowerCase().includes('cerrado')).length;
     const nextHearings = data.filter(c => c.proximaAudiencia && !c.proximaAudiencia.toLowerCase().includes('pendiente')).length;
     
-    const totalHonorarios = data.reduce((sum, c) => {
-      const valText = (c.honorarios || '').toString();
-      const valNum = Number(valText.replace(/[^0-9]/g, ''));
-      return sum + valNum;
-    }, 0);
+    const totalHonorarios = data.reduce((sum, c) => sum + parseCOP(c.honorarios), 0);
 
     const totalRecaudo = data.reduce((sum, c) => {
       const pagos = c.pagos || [];
-      const sumaPagos = pagos.reduce((pSum, p) => pSum + Number((p.monto || '').toString().replace(/[^0-9]/g, '')), 0);
+      const sumaPagos = pagos.reduce((pSum, p) => pSum + parseCOP(p.monto), 0);
       return sum + sumaPagos;
     }, 0);
 
-    setClientsStats({ total, activeCases, nextHearings, totalHonorarios, totalRecaudo });
+    const saldoPendiente = totalHonorarios - totalRecaudo;
+
+    setClientsStats({ total, activeCases, nextHearings, totalHonorarios, totalRecaudo, saldoPendiente });
   };
 
   const fetchData = async () => {
@@ -1787,6 +1846,7 @@ const AdminDashboard = ({ onExit }) => {
         juzgado: 'Por Asignar',
         registroTiempos: [], // Inicializa array de tiempos
         pagos: [], // Inicializa array de pagos
+        planPagos: [], // Inicializa array de plan de pagos
         documentosRequeridos: [
           { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: false, fecha: '' },
           { id: 'req2', nombre: 'Poder Firmado o Autenticado', subido: false, fecha: '' },
@@ -1825,6 +1885,7 @@ const AdminDashboard = ({ onExit }) => {
   const [newTimelineTitle, setNewTimelineTitle] = useState('');
   const [newTimeEntry, setNewTimeEntry] = useState({ fecha: new Date().toISOString().split('T')[0], descripcion: '', responsable: '', horas: '' });
   const [newPaymentEntry, setNewPaymentEntry] = useState({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+  const [newPlanEntry, setNewPlanEntry] = useState({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
 
   const openClientDetail = (client) => {
     setEditingClient({ 
@@ -1832,7 +1893,8 @@ const AdminDashboard = ({ onExit }) => {
       honorarios: client.honorarios || '',
       estadoFacturacion: client.estadoFacturacion || 'Al Día',
       registroTiempos: client.registroTiempos || [],
-      pagos: client.pagos || []
+      pagos: client.pagos || [],
+      planPagos: client.planPagos || []
     });
     setClientModalTab('general');
     setIsClientModalOpen(true);
@@ -1878,6 +1940,18 @@ const AdminDashboard = ({ onExit }) => {
       ]
     }));
     setNewPaymentEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+  };
+
+  const handleAddPlanEntry = () => {
+    if (!newPlanEntry.descripcion || !newPlanEntry.monto) return;
+    setEditingClient(prev => ({
+      ...prev,
+      planPagos: [
+        ...(prev.planPagos || []),
+        { ...newPlanEntry, id: Date.now() }
+      ]
+    }));
+    setNewPlanEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
   };
 
   const saveClientDetails = async (e) => {
@@ -2020,7 +2094,7 @@ const AdminDashboard = ({ onExit }) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8 animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8 animate-fade-in">
             <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl rounded-full pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
@@ -2055,7 +2129,7 @@ const AdminDashboard = ({ onExit }) => {
                 <DollarSign className="w-5 h-5 text-emerald-400" />
               </div>
               <p className="text-xl font-bold text-emerald-400 truncate mt-1">
-                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(clientsStats.totalHonorarios)}
+                {formatCOP(clientsStats.totalHonorarios)}
               </p>
               <p className="text-xs text-slate-500 mt-2">Honorarios globales</p>
             </div>
@@ -2066,9 +2140,20 @@ const AdminDashboard = ({ onExit }) => {
                 <CheckCircle2 className="w-5 h-5 text-cyan-400" />
               </div>
               <p className="text-xl font-bold text-cyan-400 truncate mt-1">
-                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(clientsStats.totalRecaudo)}
+                {formatCOP(clientsStats.totalRecaudo)}
               </p>
               <p className="text-xs text-slate-500 mt-2">Pagos registrados</p>
+            </div>
+            <div className="bg-slate-900 border border-yellow-500/20 rounded-2xl p-5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Por Cobrar</p>
+                <Activity className="w-5 h-5 text-yellow-400" />
+              </div>
+              <p className="text-xl font-bold text-yellow-400 truncate mt-1">
+                {formatCOP(clientsStats.saldoPendiente)}
+              </p>
+              <p className="text-xs text-slate-500 mt-2">Saldo pendiente</p>
             </div>
           </div>
         )}
@@ -2174,7 +2259,7 @@ const AdminDashboard = ({ onExit }) => {
                         <td className="p-4 text-slate-300">
                           {client.honorarios ? (
                             <span className="font-bold text-emerald-400">
-                              {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number((client.honorarios || '').toString().replace(/[^0-9]/g, '')))}
+                              {formatCOP(client.honorarios)}
                             </span>
                           ) : (
                             <span className="text-slate-600 italic text-xs">No fijado</span>
@@ -2448,10 +2533,54 @@ const AdminDashboard = ({ onExit }) => {
                 <div className="space-y-8 animate-fade-in">
                   
                   {/* Tarjetas Financieras */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
                       <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-emerald-400" /> Pacto de Honorarios
+                      </h4>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Total (COP)</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                          <input 
+                            type="text" 
+                            placeholder="Ej: $ 5.000.000" 
+                            value={editingClient.honorarios} 
+                            onChange={(e) => setEditingClient({...editingClient, honorarios: e.target.value})} 
+                            onBlur={(e) => setEditingClient({...editingClient, honorarios: formatCOP(e.target.value)})}
+                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-emerald-400 focus:outline-none font-bold text-emerald-400" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-cyan-400" /> Efectivamente Pagado
+                      </h4>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Suma de Pagos Recibidos</label>
+                        <p className="text-2xl font-bold text-cyan-400 mt-1">
+                           {formatCOP((editingClient.pagos || []).reduce((sum, p) => sum + parseCOP(p.monto), 0))}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-yellow-400" /> Saldo Pendiente
+                      </h4>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Por Cobrar</label>
+                        <p className="text-2xl font-bold text-yellow-400 mt-1">
+                           {formatCOP(parseCOP(editingClient.honorarios) - (editingClient.pagos || []).reduce((sum, p) => sum + parseCOP(p.monto), 0))}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-indigo-400" /> Estado de Facturación
                       </h4>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Total (COP)</label>
@@ -2502,6 +2631,65 @@ const AdminDashboard = ({ onExit }) => {
                     </div>
                   </div>
 
+                  {/* Plan de Pagos Acordado */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
+                    <div className="p-5 border-b border-white/5 bg-slate-950/30 flex justify-between items-center">
+                      <div>
+                        <h4 className="text-white font-bold flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-purple-400" /> Plan de Pagos Acordado
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-1">Registra la forma de pago, hitos y fechas establecidas en el contrato.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-slate-900/50 border-b border-white/5 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Fecha Esperada</label>
+                        <input type="date" value={newPlanEntry.fecha} onChange={e => setNewPlanEntry({...newPlanEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" />
+                      </div>
+                      <div className="md:col-span-6">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Hito / Descripción</label>
+                        <input type="text" placeholder="Ej: 50% al firmar poder..." value={newPlanEntry.descripcion} onChange={e => setNewPlanEntry({...newPlanEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1">Monto (COP)</label>
+                        <input type="text" placeholder="Ej: 2500000" value={newPlanEntry.monto} onChange={e => setNewPlanEntry({...newPlanEntry, monto: e.target.value})} onBlur={e => setNewPlanEntry({...newPlanEntry, monto: formatCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" />
+                      </div>
+                      <div className="md:col-span-1">
+                        <button onClick={handleAddPlanEntry} type="button" className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold transition-colors h-[30px]">
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-950/80 sticky top-0 text-slate-400 text-xs">
+                          <tr>
+                            <th className="p-3 font-medium">Fecha Esperada</th>
+                            <th className="p-3 font-medium">Descripción / Hito</th>
+                            <th className="p-3 font-medium text-right">Monto Esperado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-slate-300">
+                          {(!editingClient.planPagos || editingClient.planPagos.length === 0) ? (
+                            <tr><td colSpan="3" className="p-6 text-center text-xs text-slate-500">No hay plan de pagos acordado.</td></tr>
+                          ) : (
+                            editingClient.planPagos.map((entry) => (
+                              <tr key={entry.id} className="hover:bg-white/[0.02]">
+                                <td className="p-3 text-xs">{entry.fecha}</td>
+                                <td className="p-3 text-sm">{entry.descripcion}</td>
+                                <td className="p-3 text-right font-mono text-purple-400">
+                                  {formatCOP(entry.monto)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   {/* Registro de Pagos y Abonos */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
                     <div className="p-5 border-b border-white/5 bg-slate-950/30 flex justify-between items-center">
@@ -2524,7 +2712,7 @@ const AdminDashboard = ({ onExit }) => {
                       </div>
                       <div className="md:col-span-3">
                         <label className="block text-xs font-semibold text-slate-400 mb-1">Monto (COP)</label>
-                        <input type="text" placeholder="Ej: 2000000" value={newPaymentEntry.monto} onChange={e => setNewPaymentEntry({...newPaymentEntry, monto: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" />
+                        <input type="text" placeholder="Ej: 2000000" value={newPaymentEntry.monto} onChange={e => setNewPaymentEntry({...newPaymentEntry, monto: e.target.value})} onBlur={e => setNewPaymentEntry({...newPaymentEntry, monto: formatCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" />
                       </div>
                       <div className="md:col-span-1">
                         <button onClick={handleAddPayment} type="button" className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors h-[30px]">
@@ -2551,7 +2739,7 @@ const AdminDashboard = ({ onExit }) => {
                                 <td className="p-3 text-xs">{entry.fecha}</td>
                                 <td className="p-3 text-sm">{entry.descripcion}</td>
                                 <td className="p-3 text-right font-mono text-emerald-400">
-                                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number((entry.monto || '').toString().replace(/[^0-9]/g, '')))}
+                                  {formatCOP(entry.monto)}
                                 </td>
                               </tr>
                             ))
