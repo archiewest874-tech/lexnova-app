@@ -821,7 +821,7 @@ const ComparisonModule = () => {
     case: {
       title: "Case Management",
       subtitle: "Control Procesal y Operativo",
-      points: ["Integración con plataformas del Estado.", "Notificaciones de vencimiento de términos.", "Repositorio seguro de documentos y pruebas."],
+      points: ["Integración con platforms del Estado.", "Notificaciones de vencimiento de términos.", "Repositorio seguro de documentos y pruebas."],
       color: "from-purple-500 to-pink-600"
     }
   };
@@ -1414,7 +1414,7 @@ const AdminDashboard = ({ onExit }) => {
   
   // KPI States
   const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
-  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0 });
+  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0, totalHonorarios: 0 });
 
   // Estados para el Modal de Conversión (Ficha de Ingreso)
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
@@ -1466,7 +1466,15 @@ const AdminDashboard = ({ onExit }) => {
     const total = data.length;
     const activeCases = data.filter(c => c.estadoActual && !c.estadoActual.toLowerCase().includes('cerrado')).length;
     const nextHearings = data.filter(c => c.proximaAudiencia && !c.proximaAudiencia.toLowerCase().includes('pendiente')).length;
-    setClientsStats({ total, activeCases, nextHearings });
+    
+    // Sumar todos los honorarios extraídos como números limpios
+    const totalHonorarios = data.reduce((sum, c) => {
+      const valText = (c.honorarios || '').toString();
+      const valNum = Number(valText.replace(/[^0-9]/g, ''));
+      return sum + valNum;
+    }, 0);
+
+    setClientsStats({ total, activeCases, nextHearings, totalHonorarios });
   };
 
   const fetchData = async () => {
@@ -1535,6 +1543,7 @@ const AdminDashboard = ({ onExit }) => {
         direccion: conversionData.direccion,
         tipoCaso: conversionData.tipoCaso,
         fechaInicioContrato: conversionData.fechaInicio, // Dato clave para métricas futuras
+        honorarios: '', // Se inicializa vacío para llenarlo después en Ficha
         expediente: newExpediente,
         estadoActual: 'Estudio Inicial',
         proximaAudiencia: 'Pendiente de fijación',
@@ -1743,33 +1752,44 @@ const AdminDashboard = ({ onExit }) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-fade-in">
             <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl rounded-full pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Cartera de Clientes</p>
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Cartera</p>
                 <Briefcase className="w-5 h-5 text-indigo-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{clientsStats.total}</p>
-              <p className="text-xs text-slate-500 mt-2">Fichas creadas en portal</p>
+              <p className="text-3xl font-bold text-white">{clientsStats.total}</p>
+              <p className="text-xs text-slate-500 mt-2">Fichas creadas</p>
             </div>
             <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 blur-2xl rounded-full pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Casos Activos</p>
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Activos</p>
                 <Activity className="w-5 h-5 text-blue-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{clientsStats.activeCases}</p>
-              <p className="text-xs text-slate-500 mt-2">Expedientes en curso</p>
+              <p className="text-3xl font-bold text-white">{clientsStats.activeCases}</p>
+              <p className="text-xs text-slate-500 mt-2">En curso</p>
             </div>
             <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 blur-2xl rounded-full pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Audiencias Fijadas</p>
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Audiencias</p>
                 <CalendarCheck className="w-5 h-5 text-yellow-400" />
               </div>
-              <p className="text-4xl font-bold text-white">{clientsStats.nextHearings}</p>
-              <p className="text-xs text-slate-500 mt-2">Requieren atención próxima</p>
+              <p className="text-3xl font-bold text-white">{clientsStats.nextHearings}</p>
+              <p className="text-xs text-slate-500 mt-2">Próximas a vencer</p>
+            </div>
+            <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Ingresos (COP)</p>
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+              </div>
+              <p className="text-2xl font-bold text-emerald-400 truncate mt-1">
+                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(clientsStats.totalHonorarios)}
+              </p>
+              <p className="text-xs text-slate-500 mt-2">Proyectado global</p>
             </div>
           </div>
         )}
@@ -1842,7 +1862,7 @@ const AdminDashboard = ({ onExit }) => {
                     <th className="p-4 font-medium">Cliente / Titular</th>
                     <th className="p-4 font-medium">No. Expediente</th>
                     <th className="p-4 font-medium">Estado Procesal</th>
-                    <th className="p-4 font-medium">Despacho</th>
+                    <th className="p-4 font-medium">Honorarios</th>
                     <th className="p-4 font-medium text-right">Acción</th>
                   </tr>
                 </thead>
@@ -1867,12 +1887,19 @@ const AdminDashboard = ({ onExit }) => {
                           <div className="text-xs text-slate-500 mt-1">Inicio: {client.fechaInicioContrato}</div>
                         </td>
                         <td className="p-4">
-                          <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 rounded-full text-xs">
+                          <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 rounded-full text-xs mb-1 inline-block">
                             {client.estadoActual}
                           </span>
+                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{client.juzgado}</div>
                         </td>
-                        <td className="p-4 text-slate-400">
-                          {client.juzgado}
+                        <td className="p-4 text-slate-300">
+                          {client.honorarios ? (
+                            <span className="font-bold text-emerald-400">
+                              {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number((client.honorarios || '').toString().replace(/[^0-9]/g, '')))}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 italic text-xs">No fijado</span>
+                          )}
                         </td>
                         <td className="p-4 text-right">
                           <button 
