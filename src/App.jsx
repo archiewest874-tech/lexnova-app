@@ -31,6 +31,29 @@ import {
   Phone,
   Menu
 } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc } from 'firebase/firestore';
+
+// --- FIREBASE SETUP ---
+// Si estás en Vercel/Local, reemplaza este objeto con la configuración de tu proyecto de Firebase (Firestore).
+const myFirebaseConfig = {
+  apiKey: "AIzaSyCUSLPFX9ER2M8wBO2LZ34pg6V7kSZGzJU",
+  authDomain: "lexnova-production.firebaseapp.com",
+  projectId: "lexnova-production",
+  storageBucket: "lexnova-production.firebasestorage.app",
+  messagingSenderId: "75917035224",
+  appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
+};
+
+// Configuración híbrida (Funciona en Canvas y en tu Vercel)
+const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const finalConfig = envConfig && Object.keys(envConfig).length > 0 ? envConfig : myFirebaseConfig;
+
+const app = Object.keys(finalConfig).length > 0 ? initializeApp(finalConfig) : null;
+const auth = app ? getAuth(app) : null;
+const db = app ? getFirestore(app) : null;
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
 
 // --- Custom Hooks for Animations ---
 const useScrollReveal = () => {
@@ -1108,26 +1131,47 @@ const LegalModal = ({ isOpen, onClose, type }) => {
   );
 };
 
-const RegistrationModal = ({ isOpen, onClose }) => {
+const RegistrationModal = ({ isOpen, onClose, user }) => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', interest: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simular el envío seguro de datos
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setErrorMsg('');
+
+    try {
+      if (db && user) {
+        // Guardar en la base de datos real (Firestore)
+        const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
+        await addDoc(leadsRef, {
+          ...formData,
+          fechaRegistro: new Date().toISOString(),
+          userId: user.uid,
+          estado: 'nuevo_prospecto'
+        });
+      } else {
+        // Fallback si Firebase no está configurado aún (simulación local)
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.warn("Lead simulado. Configura Firebase en myFirebaseConfig para guardarlo realmente:", formData);
+      }
+      
       setIsSuccess(true);
       setTimeout(() => {
         setIsSuccess(false);
         setFormData({ name: '', email: '', phone: '', interest: '' });
         onClose();
       }, 3000); // Cierra automáticamente el modal después de 3 segundos
-    }, 1500);
+    } catch (error) {
+      console.error("Error al guardar el registro:", error);
+      setErrorMsg("Error de conexión. Por favor intenta de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1158,6 +1202,13 @@ const RegistrationModal = ({ isOpen, onClose }) => {
                 <h3 className="text-3xl font-bold text-white mb-2">Da el siguiente paso</h3>
                 <p className="text-slate-400">Completa tus datos y un experto legaltech te contactará para una demostración personalizada.</p>
               </div>
+
+              {errorMsg && (
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p className="text-sm">{errorMsg}</p>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
@@ -1271,6 +1322,28 @@ export default function App() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [legalModalConfig, setLegalModalConfig] = useState({ isOpen: false, type: 'privacidad' });
+  const [user, setUser] = useState(null);
+
+  // Inicializar Autenticación Anónima de Firebase
+  useEffect(() => {
+    if (!auth) return;
+    
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Error de autenticación:", error);
+      }
+    };
+    
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
 
   const handleScrollVisibility = (e) => {
     if (e.currentTarget.scrollTop > 400) {
@@ -1308,7 +1381,7 @@ export default function App() {
       <CTASection onOpenModal={() => setIsRegistrationOpen(true)} />
       <Footer onOpenLegal={(type) => setLegalModalConfig({ isOpen: true, type })} />
       
-      <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} />
+      <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} user={user} />
       <LegalModal 
         isOpen={legalModalConfig.isOpen} 
         type={legalModalConfig.type} 
