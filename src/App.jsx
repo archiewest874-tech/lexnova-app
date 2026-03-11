@@ -48,6 +48,12 @@ const myFirebaseConfig = {
   appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
 };
 
+// --- AI SETUP ---
+const myAiConfig = {
+  // Pega aquí tu API Key de Gemini (obtenida en Google AI Studio)
+  geminiApiKey: "AIzaSyDl7t0OFQDVbIdRCuFUP4ssEVpl1EedSdI" 
+};
+
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 const finalConfig = envConfig && Object.keys(envConfig).length > 0 ? envConfig : myFirebaseConfig;
 
@@ -269,7 +275,6 @@ const ExplainerCards = () => {
 const AILabModule = () => {
   useScrollReveal();
   const [inputText, setInputText] = useState('');
-  const [userApiKey, setUserApiKey] = useState(''); 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -285,13 +290,16 @@ const AILabModule = () => {
         const response = await fetch(url, options);
         if (!response.ok) {
           const errorText = await response.text();
+          if (response.status === 400 && errorText.includes("API key not valid")) {
+             throw new Error("API_KEY_INVALID");
+          }
           if (response.status === 401 || response.status === 403) throw new Error(`Error de autenticación: ${response.status}`);
           if (response.status >= 400 && response.status < 500 && response.status !== 429) throw new Error(`Error de cliente: ${response.status}`);
           throw new Error(`Error de red o servidor: ${response.status}`);
         }
         return await response.json();
       } catch (err) {
-        if (i === retries - 1 || err.message.includes("Error de autenticación") || err.message.includes("Error de cliente")) throw err;
+        if (i === retries - 1 || err.message === "API_KEY_INVALID" || err.message.includes("Error de autenticación") || err.message.includes("Error de cliente")) throw err;
         await new Promise(resolve => setTimeout(resolve, delays[i]));
       }
     }
@@ -307,8 +315,16 @@ const AILabModule = () => {
     setError('');
     setResult(null);
 
-    const activeApiKey = userApiKey.trim(); 
-    const model = activeApiKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
+    // Usamos la configuración directa
+    const activeApiKey = myAiConfig.geminiApiKey; 
+    
+    if (!activeApiKey) {
+        setError("La API Key de Gemini no está configurada. Por favor, añádela en la constante myAiConfig al inicio del archivo.");
+        setLoading(false);
+        return;
+    }
+
+    const model = "gemini-1.5-flash"; // Usamos un modelo más estable y rápido para producción
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`;
 
     const systemPrompt = `Actúa como un abogado experto y analista legal de una firma top. Analiza los hechos o el caso legal proporcionado. 
@@ -346,8 +362,8 @@ const AILabModule = () => {
         throw new Error("Respuesta inválida de la IA.");
       }
     } catch (err) {
-      if (err.message.includes("Error de autenticación")) {
-        setError("Error 401/403: No autorizado. Esto ocurre porque la API Key está vacía o es inválida.");
+      if (err.message === "API_KEY_INVALID" || err.message.includes("Error de autenticación")) {
+        setError("La API Key configurada es inválida o no tiene permisos.");
       } else if (err.message.includes("Error de cliente: 404")) {
          setError(`Error 404: El modelo ${model} no está disponible con esta configuración de API Key.`);
       } else {
@@ -377,7 +393,7 @@ const AILabModule = () => {
 
         <div className="grid md:grid-cols-2 gap-8 reveal-on-scroll opacity-0 translate-y-10">
           <div className="bg-slate-950 border border-white/10 rounded-2xl p-6 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-6">
               <h3 className="text-white font-semibold flex items-center gap-2">
                 <FileText className="w-5 h-5 text-slate-400" />
                 Hechos del Expediente
@@ -388,17 +404,6 @@ const AILabModule = () => {
               >
                 Cargar caso de ejemplo
               </button>
-            </div>
-            
-            <div className="mb-4">
-              <input
-                type="password"
-                className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all"
-                placeholder="🔑 Tu API Key de Gemini (Requerida para uso externo)"
-                value={userApiKey}
-                onChange={(e) => setUserApiKey(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-500 mt-1.5 ml-1">Consigue una gratis en Google AI Studio si estás fuera de la plataforma.</p>
             </div>
 
             <textarea
@@ -821,7 +826,7 @@ const ComparisonModule = () => {
           <div className="reveal-on-scroll opacity-0 translate-y-10 transition-all duration-700">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Herramientas Especializadas para cada Área.</h2>
             <p className="text-slate-400 text-lg mb-8">
-              Conoce la diferencia entre las plataformas tecnológicas y elige la estructura perfecta para escalar tu firma legal en 2026.
+              Conoce la diferencia entre las platforms tecnológicas y elige la estructura perfecta para escalar tu firma legal en 2026.
             </p>
             
             <div className="flex flex-col gap-4">
@@ -1101,7 +1106,7 @@ const LegalModal = ({ isOpen, onClose, type }) => {
       body: (
         <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
           <p><strong>1. Tratamiento de Datos Personales</strong><br/>De conformidad con la Ley 1581 de 2012 y el Decreto 1377 de 2013 de la República de Colombia, LexNova garantiza la protección, confidencialidad y seguridad de los datos personales de nuestros usuarios y los de sus clientes.</p>
-          <p><strong>2. Finalidad de la Información</strong><br/>La información recopilada se utilizará exclusivamente para el acceso a la plataforma, notificaciones procesales automatizadas, y gestión de facturación, manteniendo el estricto secreto profesional abogado-cliente.</p>
+          <p><strong>2. Finalidad de la Información</strong><br/>La información recopilada se utilizará exclusively para el acceso a la plataforma, notificaciones procesales automatizadas, y gestión de facturación, manteniendo el estricto secreto profesional abogado-cliente.</p>
           <p><strong>3. Seguridad y Mensajes de Datos</strong><br/>Implementamos encriptación de nivel militar y protocolos de seguridad bajo los estándares de la Ley 527 de 1999, garantizando la inalterabilidad y validez probatoria de la información alojada.</p>
           <p><strong>4. Derechos del Titular</strong><br/>Usted tiene derecho a conocer, actualizar, rectificar y solicitar la eliminación de sus datos en cualquier momento escribiendo a nuestro oficial de privacidad en <span className="text-cyan-400">privacidad@lexnova.com</span>.</p>
         </div>
