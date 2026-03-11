@@ -168,11 +168,13 @@ const Hero = ({ onOpenModal }) => {
           <span>El futuro del litigio y la gestión legal</span>
         </div>
         
-        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-tight leading-tight mb-12 pb-2">
+        {/* Agregado mb-16 y pb-4 para mayor separación con el párrafo inferior */}
+        <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 tracking-tight leading-tight mb-16 pb-4">
           Transformación Digital <br className="hidden md:block"/> para el Abogado Moderno.
         </h1>
         
-        <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed">
+        {/* Agregado mt-4 para empujar el texto hacia abajo y asegurar separación visual */}
+        <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12 mt-4 leading-relaxed">
           Supera las barreras del Código General del Proceso. Centraliza expedientes, automatiza tiempos y potencia tu firma con Inteligencia Artificial y gestión CRM avanzada.
         </p>
         
