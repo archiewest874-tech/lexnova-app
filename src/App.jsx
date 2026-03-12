@@ -616,7 +616,7 @@ const ClientPortalModule = () => {
         estadoActual: 'Etapa Probatoria',
         proximaAudiencia: '15 Oct, 2026',
         juzgado: '4° Laboral del Circuito',
-        honorarios: '$ 8.000.000',
+        honorarios: '8000000',
         estadoFacturacion: 'Al Día',
         registroTiempos: [
           { id: 1, fecha: '05 Sep, 2026', descripcion: 'Estudio de caso y elaboración de demanda', responsable: 'Dr. Carlos Mendoza', horas: 4.5 },
@@ -1715,7 +1715,7 @@ const AdminDashboard = ({ onExit }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [showOverviewModal, setShowOverviewModal] = useState(false); // NUEVO ESTADO PARA EL DASHBOARD FLOTANTE
+  const [showOverviewModal, setShowOverviewModal] = useState(false); 
   
   // KPI States
   const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
@@ -1739,7 +1739,7 @@ const AdminDashboard = ({ onExit }) => {
     if (passcode === 'lexnova2026') {
       setIsAuthenticated(true);
       fetchData().then(() => {
-        setShowOverviewModal(true); // Mostrar el dashboard flotante al cargar los datos tras el login
+        setShowOverviewModal(true); 
       });
     } else {
       setErrorMsg('Contraseña incorrecta.');
@@ -1853,9 +1853,9 @@ const AdminDashboard = ({ onExit }) => {
         estadoActual: 'Estudio Inicial',
         proximaAudiencia: 'Pendiente de fijación',
         juzgado: 'Por Asignar',
-        registroTiempos: [], // Inicializa array de tiempos
-        pagos: [], // Inicializa array de pagos
-        planPagos: [], // Inicializa array de plan de pagos
+        registroTiempos: [], 
+        pagos: [], 
+        planPagos: [], 
         documentosRequeridos: [
           { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: false, fecha: '' },
           { id: 'req2', nombre: 'Poder Firmado o Autenticado', subido: false, fecha: '' },
@@ -1962,6 +1962,22 @@ const AdminDashboard = ({ onExit }) => {
       ]
     }));
     setNewPlanEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+  };
+
+  const handleDeletePlanEntry = (id) => {
+    setEditingClient(prev => ({
+      ...prev,
+      planPagos: prev.planPagos.filter(entry => entry.id !== id)
+    }));
+  };
+
+  const handleToggleRequirement = (reqId) => {
+    setEditingClient(prev => ({
+      ...prev,
+      documentosRequeridos: prev.documentosRequeridos.map(req => 
+        req.id === reqId ? { ...req, subido: !req.subido, fecha: !req.subido ? new Date().toLocaleDateString() : '' } : req
+      )
+    }));
   };
 
   const saveClientDetails = async (e) => {
@@ -2409,8 +2425,9 @@ const AdminDashboard = ({ onExit }) => {
             </div>
 
             {/* Pestañas de Navegación del Modal */}
-            <div className="flex border-b border-white/10 bg-slate-950/30 px-6 shrink-0">
+            <div className="flex border-b border-white/10 bg-slate-950/30 px-6 shrink-0 overflow-x-auto">
               {[
+                { id: 'info', label: 'Datos del Cliente', icon: <User className="w-4 h-4"/> },
                 { id: 'general', label: 'Resumen Legal', icon: <Briefcase className="w-4 h-4"/> },
                 { id: 'docs', label: 'Documental', icon: <Paperclip className="w-4 h-4"/> },
                 { id: 'erp', label: 'ERP & Operación', icon: <Activity className="w-4 h-4"/> }
@@ -2418,7 +2435,7 @@ const AdminDashboard = ({ onExit }) => {
                 <button
                   key={tab.id}
                   onClick={() => setClientModalTab(tab.id)}
-                  className={`px-5 py-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-colors ${clientModalTab === tab.id ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                  className={`px-5 py-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${clientModalTab === tab.id ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
                 >
                   {tab.icon} {tab.label}
                 </button>
@@ -2427,6 +2444,37 @@ const AdminDashboard = ({ onExit }) => {
 
             <div className="flex-1 overflow-y-auto p-6 bg-slate-900/50">
               
+              {/* TAB 0: DATOS DEL CLIENTE */}
+              {clientModalTab === 'info' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Información Personal y Contacto</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nombre Completo / Titular</label>
+                        <input type="text" value={editingClient.nombre} onChange={(e) => setEditingClient({...editingClient, nombre: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Cédula / NIT</label>
+                        <input type="text" value={editingClient.cedula || ''} onChange={(e) => setEditingClient({...editingClient, cedula: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Teléfono Celular</label>
+                        <input type="tel" value={editingClient.telefono || ''} onChange={(e) => setEditingClient({...editingClient, telefono: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Correo Electrónico</label>
+                        <input type="email" value={editingClient.email || ''} onChange={(e) => setEditingClient({...editingClient, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Dirección de Residencia / Notificación</label>
+                        <input type="text" value={editingClient.direccion || ''} onChange={(e) => setEditingClient({...editingClient, direccion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* TAB 1: RESUMEN LEGAL */}
               {clientModalTab === 'general' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
@@ -2441,7 +2489,22 @@ const AdminDashboard = ({ onExit }) => {
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-slate-400 mb-1.5">Tipo de Caso</label>
-                            <input type="text" value={editingClient.tipoCaso} onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                            <div className="relative">
+                              <select 
+                                value={editingClient.tipoCaso || 'Sin Asignar'} 
+                                onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} 
+                                className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none appearance-none cursor-pointer"
+                              >
+                                <option value="Sin Asignar" disabled>Seleccione...</option>
+                                <option value="Penal">Penal</option>
+                                <option value="Civil">Civil</option>
+                                <option value="Familia">Familia</option>
+                                <option value="Laboral">Laboral</option>
+                                <option value="Administrativo">Administrativo</option>
+                                <option value="Constitucional">Constitucional</option>
+                              </select>
+                              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 rotate-90 pointer-events-none" />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2506,8 +2569,16 @@ const AdminDashboard = ({ onExit }) => {
                         <p className="text-xs text-slate-500 italic">No hay requisitos de ingreso definidos.</p>
                       )}
                       {editingClient.documentosRequeridos?.map(req => (
-                         <div key={req.id} className="flex justify-between items-center text-sm p-3 bg-slate-950/30 rounded border border-white/5">
-                            <span className={req.subido ? "text-slate-500 line-through truncate" : "text-slate-200 truncate"}>{req.nombre}</span>
+                         <div key={req.id} className="flex justify-between items-center text-sm p-3 bg-slate-950/30 rounded border border-white/5 hover:bg-slate-950/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <input 
+                                type="checkbox" 
+                                checked={req.subido} 
+                                onChange={() => handleToggleRequirement(req.id)}
+                                className="w-4 h-4 rounded bg-slate-900 border-white/10 text-emerald-400 focus:ring-emerald-400 focus:ring-offset-slate-950 cursor-pointer"
+                              />
+                              <span className={req.subido ? "text-slate-500 line-through truncate" : "text-slate-200 truncate"}>{req.nombre}</span>
+                            </div>
                             <span className={`shrink-0 ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${req.subido ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-400"}`}>
                               {req.subido ? 'Recibido' : 'Pendiente'}
                             </span>
@@ -2671,18 +2742,19 @@ const AdminDashboard = ({ onExit }) => {
                       </div>
                     </div>
 
-                    <div className="max-h-48 overflow-y-auto">
+                    <div className="max-h-64 overflow-y-auto">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-950/80 sticky top-0 text-slate-400 text-xs">
                           <tr>
                             <th className="p-3 font-medium">Fecha Esperada</th>
                             <th className="p-3 font-medium">Descripción / Hito</th>
                             <th className="p-3 font-medium text-right">Monto Esperado</th>
+                            <th className="p-3 font-medium text-center w-10"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5 text-slate-300">
                           {(!editingClient.planPagos || editingClient.planPagos.length === 0) ? (
-                            <tr><td colSpan="3" className="p-6 text-center text-xs text-slate-500">No hay plan de pagos acordado.</td></tr>
+                            <tr><td colSpan="4" className="p-6 text-center text-xs text-slate-500">No hay plan de pagos acordado.</td></tr>
                           ) : (
                             editingClient.planPagos.map((entry) => (
                               <tr key={entry.id} className="hover:bg-white/[0.02]">
@@ -2690,6 +2762,11 @@ const AdminDashboard = ({ onExit }) => {
                                 <td className="p-3 text-sm">{entry.descripcion}</td>
                                 <td className="p-3 text-right font-mono text-purple-400">
                                   {formatCOP(entry.monto)}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <button onClick={() => handleDeletePlanEntry(entry.id)} className="text-red-400 hover:text-red-300 p-1" title="Eliminar hito">
+                                    <X className="w-4 h-4" />
+                                  </button>
                                 </td>
                               </tr>
                             ))
