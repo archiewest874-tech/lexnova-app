@@ -66,7 +66,7 @@ const myFirebaseConfig = {
 
 // --- AI SETUP ---
 const myAiConfig = {
-  geminiApiKey: "AIzaSyDl7t0OFQDVbIdRCuFUP4ssEVpl1EedSdI" 
+  geminiApiKey: "" 
 };
 
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -346,11 +346,8 @@ const AILabModule = () => {
 
     const activeApiKey = myAiConfig.geminiApiKey; 
     
-    if (!activeApiKey) {
-        setError("La API Key de Gemini no está configurada. Por favor, añádela en la constante myAiConfig al inicio del archivo.");
-        setLoading(false);
-        return;
-    }
+    // El entorno inyecta automáticamente la API key por seguridad en tiempo de ejecución.
+    // Por lo tanto, eliminamos la validación estricta de que exista la llave localmente.
 
     const model = "gemini-2.5-flash-preview-09-2025"; 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`;
