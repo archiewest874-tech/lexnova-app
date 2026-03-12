@@ -45,7 +45,8 @@ import {
   UploadCloud,
   Clock,
   UserCheck,
-  Wallet
+  Wallet,
+  ExternalLink
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -79,7 +80,8 @@ const formatCOP = (val) => {
   if (!val) return '';
   const num = Number(val.toString().replace(/[^0-9]/g, ''));
   if (isNaN(num) || num === 0) return '$ 0';
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(num);
+  // Aseguramos el formato exacto "$ X.XXX.XXX"
+  return '$ ' + num.toLocaleString('es-CO');
 };
 
 const parseCOP = (val) => {
@@ -1891,6 +1893,7 @@ const AdminDashboard = ({ onExit }) => {
     setEditingClient({ 
       ...client, 
       honorarios: client.honorarios || '',
+      formaPago: client.formaPago || '',
       estadoFacturacion: client.estadoFacturacion || 'Al Día',
       registroTiempos: client.registroTiempos || [],
       pagos: client.pagos || [],
@@ -2501,9 +2504,19 @@ const AdminDashboard = ({ onExit }) => {
                   </div>
 
                   <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                      <Paperclip className="w-4 h-4 text-cyan-400" /> Repositorio General
-                    </h4>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <Paperclip className="w-4 h-4 text-cyan-400" /> Repositorio General
+                      </h4>
+                      <button 
+                        onClick={() => window.open(`https://drive.google.com/drive/search?q=${editingClient.id}`, '_blank')}
+                        className="text-xs px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-cyan-400 border border-white/10 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                        title={`ID Interno de Carpeta: ${editingClient.id}`}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Abrir Carpeta Nube
+                      </button>
+                    </div>
                     <div className="flex gap-2 mb-4">
                       <input type="text" placeholder="Nombre del nuevo documento..." value={newDocName} onChange={(e) => setNewDocName(e.target.value)} className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                       <button onClick={handleAddDocument} type="button" className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
@@ -2583,43 +2596,12 @@ const AdminDashboard = ({ onExit }) => {
                         <CreditCard className="w-4 h-4 text-indigo-400" /> Estado de Facturación
                       </h4>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Total (COP)</label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                          <input 
-                            type="text" 
-                            placeholder="Ej: $ 5.000.000" 
-                            value={editingClient.honorarios} 
-                            onChange={(e) => setEditingClient({...editingClient, honorarios: e.target.value})} 
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-emerald-400 focus:outline-none font-bold text-emerald-400" 
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-cyan-400" /> Recaudo Actual
-                      </h4>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Suma de Pagos Recibidos</label>
-                        <p className="text-2xl font-bold text-cyan-400 mt-1">
-                           {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format((editingClient.pagos || []).reduce((sum, p) => sum + Number((p.monto || '').toString().replace(/[^0-9]/g, '')), 0))}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-yellow-400" /> Estado de Facturación
-                      </h4>
-                      <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estatus Actual</label>
                         <div className="relative">
                           <select 
                             value={editingClient.estadoFacturacion || 'Al Día'} 
                             onChange={(e) => setEditingClient({...editingClient, estadoFacturacion: e.target.value})} 
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-3 pr-10 text-sm text-white focus:border-yellow-400 focus:outline-none appearance-none cursor-pointer"
+                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-3 pr-10 text-sm text-white focus:border-indigo-400 focus:outline-none appearance-none cursor-pointer"
                           >
                             <option value="Al Día">Al Día (Pagado)</option>
                             <option value="Pendiente">Pendiente de Cobro</option>
@@ -2629,6 +2611,20 @@ const AdminDashboard = ({ onExit }) => {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Forma de Pago (General) */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-white mb-2 uppercase tracking-wider flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-400" /> Condiciones y Forma de Pago
+                    </h4>
+                    <p className="text-xs text-slate-400 mb-3">Describe la modalidad de pago general estipulada en el contrato (ej. 50% anticipo, 50% contra éxito, cuotas mensuales, etc.)</p>
+                    <textarea 
+                      value={editingClient.formaPago} 
+                      onChange={(e) => setEditingClient({...editingClient, formaPago: e.target.value})} 
+                      placeholder="Ej: El cliente pagará mediante transferencia bancaria. El 50% al inicio de la gestión y el 50% restante al momento de emitirse el fallo..."
+                      className="w-full bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-slate-300 focus:border-purple-400 focus:outline-none resize-none h-20"
+                    />
                   </div>
 
                   {/* Plan de Pagos Acordado */}
