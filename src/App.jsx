@@ -1719,7 +1719,7 @@ const AdminDashboard = ({ onExit }) => {
   
   // KPI States
   const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
-  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0, totalHonorarios: 0, totalRecaudo: 0, saldoPendiente: 0 });
+  const [clientsStats, setClientsStats] = useState({ total: 0, activeCases: 0, nextHearings: 0, totalHonorarios: 0, totalRecaudo: 0, saldoPendiente: 0, totalProximosPagos: 0 });
 
   // Estados para el Modal de Conversión (Ficha de Ingreso)
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
@@ -1784,7 +1784,35 @@ const AdminDashboard = ({ onExit }) => {
 
     const saldoPendiente = totalHonorarios - totalRecaudo;
 
-    setClientsStats({ total, activeCases, nextHearings, totalHonorarios, totalRecaudo, saldoPendiente });
+    // Cálculo de Pagos Próximos (15 días)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const fifteenDaysFromNow = new Date(today);
+    fifteenDaysFromNow.setDate(today.getDate() + 15);
+
+    const totalProximosPagos = data.reduce((sum, c) => {
+      const planPagos = c.planPagos || [];
+      const sumaProximos = planPagos.reduce((pSum, plan) => {
+        if (plan.fecha) {
+          let planDateObj = new Date(plan.fecha);
+          // Ajuste de zona horaria seguro para inputs type="date" (YYYY-MM-DD)
+          if (plan.fecha.includes('-')) {
+            const [y, m, d] = plan.fecha.split('-');
+            planDateObj = new Date(y, m - 1, d);
+          }
+          
+          if (!isNaN(planDateObj.getTime())) {
+            if (planDateObj >= today && planDateObj <= fifteenDaysFromNow) {
+              return pSum + parseCOP(plan.monto);
+            }
+          }
+        }
+        return pSum;
+      }, 0);
+      return sum + sumaProximos;
+    }, 0);
+
+    setClientsStats({ total, activeCases, nextHearings, totalHonorarios, totalRecaudo, saldoPendiente, totalProximosPagos });
   };
 
   const fetchData = async () => {
@@ -3039,6 +3067,19 @@ const AdminDashboard = ({ onExit }) => {
                                   <p className="text-sm font-bold text-white">{formatCOP(clientsStats.saldoPendiente)}</p>
                                 </div>
                               </div>
+                            </div>
+
+                            <div className="mt-6 flex items-center justify-between bg-purple-500/10 p-3.5 rounded-xl border border-purple-500/20">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                                  <Calendar className="w-4 h-4 text-purple-400" />
+                                </div>
+                                <div>
+                                  <span className="text-xs text-purple-300 font-bold block uppercase tracking-wider">Próximos 15 Días</span>
+                                  <span className="text-[10px] text-purple-400/70">Pagos programados por cobrar</span>
+                                </div>
+                              </div>
+                              <span className="text-lg font-bold text-purple-400">{formatCOP(clientsStats.totalProximosPagos)}</span>
                             </div>
                           </div>
                         );
