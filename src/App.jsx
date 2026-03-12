@@ -131,7 +131,7 @@ const scrollToSection = (e, targetId) => {
 
 // --- Components ---
 
-const NavBar = () => {
+const NavBar = ({ onOpenModal }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavClick = (e, targetId) => {
@@ -168,8 +168,8 @@ const NavBar = () => {
             <User className="w-4 h-4" />
             Ingresar
           </button>
-          <button className="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-full text-sm font-semibold transition-all border border-white/10 flex items-center gap-2 group">
-            Explorar Plataforma
+          <button onClick={onOpenModal} className="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-full text-sm font-semibold transition-all border border-white/10 flex items-center gap-2 group">
+            Solicitar Atención
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
@@ -202,8 +202,8 @@ const NavBar = () => {
               <User className="w-5 h-5" />
               Ingresar al Portal
             </button>
-            <button className="w-full bg-white/10 hover:bg-white/20 text-white py-3.5 rounded-xl font-bold mt-2 flex justify-center items-center gap-2 transition-all">
-              Explorar Plataforma
+            <button onClick={() => { setIsMobileMenuOpen(false); onOpenModal(); }} className="w-full bg-white/10 hover:bg-white/20 text-white py-3.5 rounded-xl font-bold mt-2 flex justify-center items-center gap-2 transition-all">
+              Solicitar Atención
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
@@ -1583,7 +1583,7 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
             <>
               <div className="mb-8">
                 <h3 className="text-3xl font-bold text-white mb-2">Da el siguiente paso</h3>
-                <p className="text-slate-400">Completa tus datos y un experto legaltech te contactará para una demostración personalizada.</p>
+                <p className="text-slate-400">Completa tus datos y un experto de LexNova te contactará para una atención personalizada.</p>
               </div>
 
               {errorMsg && (
@@ -1651,7 +1651,9 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
                       onChange={(e) => setFormData({...formData, interest: e.target.value})}
                       className="w-full bg-slate-950/50 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white appearance-none focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all cursor-pointer"
                     >
-                      <option value="" disabled className="bg-slate-900">Selecciona una solución...</option>
+                      <option value="" disabled className="bg-slate-900">Selecciona el Área de Interés...</option>
+                      <option value="consulta" className="bg-slate-900">Consulta Jurídica</option>
+                      <option value="asesoria" className="bg-slate-900">Asesoría Jurídica</option>
                       <option value="case-management" className="bg-slate-900">Gestión de Expedientes y Litigios (CRM/ERP)</option>
                       <option value="vigilancia" className="bg-slate-900">Vigilancia Judicial Automatizada</option>
                       <option value="ia-legal" className="bg-slate-900">Laboratorio de Inteligencia Artificial Legal</option>
@@ -1761,7 +1763,7 @@ const AdminDashboard = ({ onExit }) => {
     for (const [key, value] of Object.entries(interestCounts)) {
       if (value > maxCount) {
         maxCount = value;
-        topInterest = key === 'ia-legal' ? 'IA Legal' : key === 'vigilancia' ? 'Vigilancia' : 'Case Mgmt';
+        topInterest = key === 'ia-legal' ? 'IA Legal' : key === 'vigilancia' ? 'Vigilancia' : key === 'consulta' ? 'Consulta' : key === 'asesoria' ? 'Asesoría' : 'Case Mgmt';
       }
     }
     setLeadsStats({ total, thisWeek, topInterest });
@@ -1820,7 +1822,7 @@ const AdminDashboard = ({ onExit }) => {
       email: lead.email || '',
       telefono: lead.phone || '',
       direccion: '',
-      tipoCaso: lead.interest === 'ia-legal' ? 'Asesoría IA Legal' : (lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : 'Representación Litigiosa'),
+      tipoCaso: lead.interest === 'ia-legal' ? 'Asesoría IA Legal' : (lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : (lead.interest === 'consulta' ? 'Consulta Jurídica' : (lead.interest === 'asesoria' ? 'Asesoría Jurídica' : 'Representación Litigiosa'))),
       fechaInicio: new Date().toISOString().split('T')[0]
     });
     setIsConversionModalOpen(true);
@@ -2213,7 +2215,7 @@ const AdminDashboard = ({ onExit }) => {
                         </td>
                         <td className="p-4">
                           <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs">
-                            {lead.interest === 'ia-legal' ? 'IA Legal' : lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : 'Case Management'}
+                            {lead.interest === 'ia-legal' ? 'IA Legal' : lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : lead.interest === 'consulta' ? 'Consulta Jurídica' : lead.interest === 'asesoria' ? 'Asesoría Jurídica' : 'Case Management'}
                           </span>
                         </td>
                         <td className="p-4 text-slate-400">
@@ -3021,12 +3023,12 @@ const AdminDashboard = ({ onExit }) => {
                       {(() => {
                         if (leads.length === 0) return <p className="text-sm text-slate-500 italic">No hay prospectos registrados aún.</p>;
                         
-                        const interestTypes = { 'ia-legal': 0, 'vigilancia': 0, 'case-management': 0 };
+                        const interestTypes = { 'consulta': 0, 'asesoria': 0, 'ia-legal': 0, 'vigilancia': 0, 'case-management': 0 };
                         leads.forEach(l => { if (interestTypes[l.interest] !== undefined) interestTypes[l.interest]++; });
                         
                         const maxCount = Math.max(...Object.values(interestTypes), 1);
                         
-                        const formatLabel = (key) => key === 'ia-legal' ? 'Inteligencia Artificial' : key === 'vigilancia' ? 'Vigilancia Judicial' : 'Gestión CRM/ERP';
+                        const formatLabel = (key) => key === 'ia-legal' ? 'Inteligencia Artificial' : key === 'vigilancia' ? 'Vigilancia Judicial' : key === 'consulta' ? 'Consulta' : key === 'asesoria' ? 'Asesoría' : 'Gestión CRM/ERP';
 
                         return (
                           <div className="flex items-end justify-around h-40 pt-4 border-b border-white/10 pb-4">
@@ -3113,7 +3115,7 @@ export default function App() {
       onScroll={handleScrollVisibility}
       className="h-screen overflow-y-auto overflow-x-hidden bg-slate-950 text-slate-50 font-sans selection:bg-cyan-500/30 relative scroll-smooth"
     >
-      <NavBar />
+      <NavBar onOpenModal={() => setIsRegistrationOpen(true)} />
       <Hero onOpenModal={() => setIsRegistrationOpen(true)} />
       <ExplainerCards />
       <AILabModule />
