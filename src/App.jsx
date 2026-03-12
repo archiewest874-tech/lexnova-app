@@ -46,7 +46,9 @@ import {
   Clock,
   UserCheck,
   Wallet,
-  ExternalLink
+  ExternalLink,
+  Target,
+  LayoutDashboard
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -1711,6 +1713,7 @@ const AdminDashboard = ({ onExit }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [showOverviewModal, setShowOverviewModal] = useState(false); // NUEVO ESTADO PARA EL DASHBOARD FLOTANTE
   
   // KPI States
   const [leadsStats, setLeadsStats] = useState({ total: 0, thisWeek: 0, topInterest: '-' });
@@ -1733,7 +1736,9 @@ const AdminDashboard = ({ onExit }) => {
     e.preventDefault();
     if (passcode === 'lexnova2026') {
       setIsAuthenticated(true);
-      fetchData();
+      fetchData().then(() => {
+        setShowOverviewModal(true); // Mostrar el dashboard flotante al cargar los datos tras el login
+      });
     } else {
       setErrorMsg('Contraseña incorrecta.');
       setPasscode('');
@@ -2031,7 +2036,13 @@ const AdminDashboard = ({ onExit }) => {
             </h1>
             <p className="text-slate-400 mt-2">Métricas y gestión de ciclo de vida del cliente.</p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
+            <button 
+              onClick={() => setShowOverviewModal(true)} 
+              className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
+            >
+              <LayoutDashboard className="w-4 h-4" /> Resumen Ejecutivo
+            </button>
             <button onClick={fetchData} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
               <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
             </button>
@@ -2838,6 +2849,215 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         </div>
       )}
+
+      {/* --- DASHBOARD DIRECTIVO FLOTANTE (RESUMEN EJECUTIVO) --- */}
+      {showOverviewModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md transition-opacity" onClick={() => setShowOverviewModal(false)} />
+          
+          <div className="relative w-full max-w-5xl bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up flex flex-col max-h-[95vh]">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 blur-[100px] rounded-full pointer-events-none" />
+            
+            <div className="p-6 border-b border-white/10 bg-slate-950/80 flex justify-between items-center shrink-0 backdrop-blur-sm z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                  <Target className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">Dashboard Directivo</h3>
+                  <p className="text-sm text-cyan-400 font-medium">Radiografía General de la Firma</p>
+                </div>
+              </div>
+              <button onClick={() => setShowOverviewModal(false)} className="text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto z-10 space-y-8 flex-1 custom-scrollbar">
+              
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                  <Loader2 className="w-10 h-10 animate-spin mb-4 text-cyan-400" />
+                  <p>Calculando métricas generales...</p>
+                </div>
+              ) : (
+                <>
+                  {/* --- TOP KPIs --- */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-slate-950/50 border border-white/5 p-6 rounded-2xl flex items-center gap-5">
+                      <div className="w-14 h-14 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+                        <Users className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Prospectos</p>
+                        <p className="text-3xl font-extrabold text-white">{leadsStats.total}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-slate-950/50 border border-white/5 p-6 rounded-2xl flex items-center gap-5">
+                      <div className="w-14 h-14 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                        <FolderOpen className="w-6 h-6 text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Casos Activos</p>
+                        <p className="text-3xl font-extrabold text-white">{clientsStats.activeCases}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/50 border border-white/5 p-6 rounded-2xl flex items-center gap-5">
+                      <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                        <DollarSign className="w-6 h-6 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Recaudo Total</p>
+                        <p className="text-2xl font-extrabold text-emerald-400">{formatCOP(clientsStats.totalRecaudo)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* --- GRAFICOS Y DESGLOSE --- */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* Gráfico 1: Salud Financiera (Progress Bar Custom) */}
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-6">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-2">
+                        <PieChart className="w-4 h-4 text-emerald-400" /> Salud Financiera
+                      </h4>
+                      
+                      {(() => {
+                        const recaudoPorcentaje = clientsStats.totalHonorarios ? Math.round((clientsStats.totalRecaudo / clientsStats.totalHonorarios) * 100) : 0;
+                        const saldoPorcentaje = clientsStats.totalHonorarios ? 100 - recaudoPorcentaje : 0;
+                        
+                        return (
+                          <div className="space-y-6">
+                            <div>
+                              <div className="flex justify-between text-xs mb-2">
+                                <span className="text-slate-400">Meta / Proyección Total</span>
+                                <span className="font-bold text-white">{formatCOP(clientsStats.totalHonorarios)}</span>
+                              </div>
+                              <div className="w-full h-8 flex rounded-lg overflow-hidden border border-white/10">
+                                <div style={{width: `${recaudoPorcentaje}%`}} className="bg-emerald-500 relative flex items-center justify-center group transition-all duration-1000">
+                                  {recaudoPorcentaje > 10 && <span className="text-[10px] font-bold text-emerald-950">{recaudoPorcentaje}%</span>}
+                                </div>
+                                <div style={{width: `${saldoPorcentaje}%`}} className="bg-yellow-500/80 relative flex items-center justify-center group transition-all duration-1000">
+                                  {saldoPorcentaje > 10 && <span className="text-[10px] font-bold text-yellow-950">{saldoPorcentaje}%</span>}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 mt-4">
+                              <div className="flex items-start gap-3">
+                                <div className="w-3 h-3 rounded bg-emerald-500 mt-1 shrink-0" />
+                                <div>
+                                  <p className="text-xs text-slate-400">Recaudado</p>
+                                  <p className="text-sm font-bold text-white">{formatCOP(clientsStats.totalRecaudo)}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-start gap-3">
+                                <div className="w-3 h-3 rounded bg-yellow-500/80 mt-1 shrink-0" />
+                                <div>
+                                  <p className="text-xs text-slate-400">Saldo Pendiente</p>
+                                  <p className="text-sm font-bold text-white">{formatCOP(clientsStats.saldoPendiente)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Gráfico 2: Distribución de Casos por Área */}
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-6">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-cyan-400" /> Distribución de Casos
+                      </h4>
+                      
+                      {(() => {
+                        if (clients.length === 0) return <p className="text-sm text-slate-500 italic">No hay casos registrados aún.</p>;
+                        
+                        const caseTypes = clients.reduce((acc, c) => {
+                           const t = c.tipoCaso || 'Sin Clasificar';
+                           acc[t] = (acc[t] || 0) + 1;
+                           return acc;
+                        }, {});
+                        
+                        const colors = ['bg-cyan-400', 'bg-indigo-500', 'bg-purple-500', 'bg-emerald-400', 'bg-pink-500', 'bg-yellow-400'];
+                        const caseArray = Object.entries(caseTypes)
+                          .map(([name, count], index) => ({ name, count, percent: Math.round((count/clients.length)*100), color: colors[index % colors.length] }))
+                          .sort((a,b) => b.count - a.count);
+
+                        return (
+                          <div>
+                            {/* Barra Segmentada */}
+                            <div className="w-full h-4 flex rounded-full overflow-hidden border border-white/10 mb-6">
+                              {caseArray.map((item, i) => (
+                                <div key={i} style={{width: `${item.percent}%`}} className={`${item.color} transition-all duration-1000`} title={`${item.name} (${item.percent}%)`} />
+                              ))}
+                            </div>
+                            
+                            {/* Leyenda */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                              {caseArray.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/30 border border-white/5">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <div className={`w-3 h-3 rounded-full ${item.color} shrink-0`} />
+                                    <span className="text-xs text-slate-300 truncate">{item.name}</span>
+                                  </div>
+                                  <span className="text-xs font-bold text-white shrink-0 ml-2">{item.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Gráfico 3: Intereses de Prospectos (Mini Bar Chart Vertical) */}
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-6 lg:col-span-2">
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-blue-400" /> Demanda de Servicios (Leads)
+                      </h4>
+                      
+                      {(() => {
+                        if (leads.length === 0) return <p className="text-sm text-slate-500 italic">No hay prospectos registrados aún.</p>;
+                        
+                        const interestTypes = { 'ia-legal': 0, 'vigilancia': 0, 'case-management': 0 };
+                        leads.forEach(l => { if (interestTypes[l.interest] !== undefined) interestTypes[l.interest]++; });
+                        
+                        const maxCount = Math.max(...Object.values(interestTypes), 1);
+                        
+                        const formatLabel = (key) => key === 'ia-legal' ? 'Inteligencia Artificial' : key === 'vigilancia' ? 'Vigilancia Judicial' : 'Gestión CRM/ERP';
+
+                        return (
+                          <div className="flex items-end justify-around h-40 pt-4 border-b border-white/10 pb-4">
+                            {Object.entries(interestTypes).map(([key, count], i) => {
+                              const heightPercent = Math.round((count / maxCount) * 100);
+                              return (
+                                <div key={i} className="flex flex-col items-center justify-end h-full w-full max-w-[120px] group">
+                                  <div className="text-xs font-bold text-cyan-400 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">{count}</div>
+                                  <div className="w-full bg-slate-950 border border-white/5 rounded-t-lg relative flex items-end justify-center h-full">
+                                    <div 
+                                      style={{height: `${heightPercent}%`}} 
+                                      className="w-full bg-gradient-to-t from-blue-600 to-cyan-400 rounded-t-lg transition-all duration-1000 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                                    />
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 mt-3 text-center leading-tight h-8 flex items-center">{formatLabel(key)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
