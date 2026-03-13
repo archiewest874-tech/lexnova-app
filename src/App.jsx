@@ -65,19 +65,10 @@ const myFirebaseConfig = {
 };
 
 // --- AI SETUP ---
-let localApiKey = "";
-try {
-  // Intenta leer la variable de entorno en Vercel o Local (Vite o Create React App)
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
-    localApiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  } else if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_GEMINI_API_KEY) {
-    localApiKey = process.env.REACT_APP_GEMINI_API_KEY;
-  }
-} catch (e) {}
-
+// ¡Atención! La API Key ya no vive en el Frontend por seguridad.
+// Toda la comunicación con Gemini ahora se delega a tu servidor backend (Vercel Functions).
 const myAiConfig = {
-  // Si existe la variable enmascarada la usa, si no, usa "" para el simulador
-  geminiApiKey: localApiKey || "" 
+  // Configuración delegada al backend (/api/analyze)
 };
 
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -93,7 +84,6 @@ const formatCOP = (val) => {
   if (!val) return '';
   const num = Number(val.toString().replace(/[^0-9]/g, ''));
   if (isNaN(num) || num === 0) return '$ 0';
-  // Aseguramos el formato exacto "$ X.XXX.XXX"
   return '$ ' + num.toLocaleString('es-CO');
 };
 
@@ -323,28 +313,6 @@ const AILabModule = () => {
     setInputText(`Hechos: El día 15 de marzo de 2025, el trabajador Juan Pérez fue despedido de la empresa Industrias XYZ bajo la causal de "bajo rendimiento". Sin embargo, no se llevó a cabo ningún proceso disciplinario previo, ni se le otorgaron memorandos o descargos. El trabajador tenía fuero sindical vigente hasta diciembre de 2025. El empleado busca demandar por despido injustificado y violación al debido proceso laboral.`);
   };
 
-  const fetchWithRetry = async (url, options, retries = 5) => {
-    const delays = [1000, 2000, 4000, 8000, 16000];
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          const errorText = await response.text();
-          if (response.status === 400 && errorText.includes("API key not valid")) {
-             throw new Error("API_KEY_INVALID");
-          }
-          if (response.status === 401 || response.status === 403) throw new Error(`Error de autenticación: ${response.status}`);
-          if (response.status >= 400 && response.status < 500 && response.status !== 429) throw new Error(`Error de cliente: ${response.status}`);
-          throw new Error(`Error de red o servidor: ${response.status}`);
-        }
-        return await response.json();
-      } catch (err) {
-        if (i === retries - 1 || err.message === "API_KEY_INVALID" || err.message.includes("Error de autenticación") || err.message.includes("Error de cliente")) throw err;
-        await new Promise(resolve => setTimeout(resolve, delays[i]));
-      }
-    }
-  };
-
   const analyzeCase = async () => {
     if (!inputText.trim()) {
       setError("Por favor, ingresa los hechos del caso procesal.");
@@ -355,56 +323,38 @@ const AILabModule = () => {
     setError('');
     setResult(null);
 
-    const activeApiKey = myAiConfig.geminiApiKey; 
-    
-    // El entorno inyecta automáticamente la API key por seguridad en tiempo de ejecución.
-    // Por lo tanto, eliminamos la validación estricta de que exista la llave localmente.
-
-    const model = "gemini-2.5-flash-preview-09-2025"; 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeApiKey}`;
-
-    const systemPrompt = `Actúa como un abogado experto y analista legal de una firma top. Analiza los hechos o el caso legal proporcionado. 
-    Debes devolver un JSON estrictamente estructurado que resuma el caso, extraiga los puntos clave procesales o materiales, y asigne un nivel de riesgo (Bajo, Medio, Alto) con una breve recomendación.`;
-
-    const payload = {
-      contents: [{ parts: [{ text: `${systemPrompt}\n\nTexto a analizar:\n${inputText}` }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            resumen_ejecutivo: { type: "STRING" },
-            puntos_clave: { type: "ARRAY", items: { type: "STRING" } },
-            nivel_riesgo: { type: "STRING" },
-            recomendacion: { type: "STRING" }
-          },
-          required: ["resumen_ejecutivo", "puntos_clave", "nivel_riesgo", "recomendacion"]
-        }
-      }
-    };
-
     try {
-      const data = await fetchWithRetry(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      // Llamas a tu propia función de Vercel (Backend seguro)
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputText: inputText })
       });
 
-      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (responseText) {
+      if (!response.ok) {
+        throw new Error(`Error en el servidor backend: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Manejo flexible dependiendo de cómo devuelva tu backend:
+      // Caso 1: Si el backend envía la respuesta cruda de Gemini (data.candidates...)
+      if (data.candidates && data.candidates.length > 0) {
+        const responseText = data.candidates[0].content?.parts?.[0]?.text;
         const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         setResult(JSON.parse(cleanText));
-      } else {
-        throw new Error("Respuesta inválida de la IA.");
+      } 
+      // Caso 2: Si tu backend ya procesó la data y envió el objeto JSON limpio directamente
+      else if (data.resumen_ejecutivo) {
+        setResult(data);
+      } 
+      else {
+        throw new Error("Estructura de respuesta del backend no reconocida.");
       }
+
     } catch (err) {
-      if (err.message === "API_KEY_INVALID" || err.message.includes("Error de autenticación")) {
-        setError("Error de API Key. Si estás en Vercel/Local, asegúrate de configurar VITE_GEMINI_API_KEY en tus variables de entorno.");
-      } else if (err.message.includes("Error de cliente: 404")) {
-         setError(`Error 404: El modelo ${model} no está disponible con esta configuración de API Key.`);
-      } else {
-        setError("No se pudo conectar con la Inteligencia Artificial. Revisa la consola para más detalles.");
-      }
+      console.error("Error al analizar el caso:", err);
+      setError("No se pudo conectar con el servidor seguro (/api/analyze). Verifica que tu backend esté configurado y desplegado correctamente.");
     } finally {
       setLoading(false);
     }
