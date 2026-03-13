@@ -337,7 +337,13 @@ const AILabModule = () => {
 
       const data = await response.json();
 
-      // Procesamos la respuesta limpia del backend
+      // 1. NUEVO: Verificamos si Google nos devolvió un error (ej. API Key inválida)
+      if (data.error) {
+        const mensajeGoogle = typeof data.error === 'string' ? data.error : data.error.message;
+        throw new Error(`Rechazado por Google Gemini: ${mensajeGoogle}`);
+      }
+
+      // 2. Procesamos la respuesta limpia del backend
       if (data.resumen_ejecutivo) {
         setResult(data);
       } else if (data.candidates && data.candidates.length > 0) {
@@ -345,13 +351,14 @@ const AILabModule = () => {
          const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
          setResult(JSON.parse(cleanText));
       } else {
-        throw new Error("Formato de respuesta desconocido.");
+        console.error("Respuesta cruda del servidor:", data);
+        throw new Error("Formato desconocido. Abre la consola (F12) para ver la respuesta real.");
       }
 
     } catch (err) {
       console.error("Error al analizar el caso:", err);
-      // ESTE ES EL NUEVO MENSAJE DE ERROR
-      setError(`Error de conexión: ${err.message}. Verifica que /api/analyze esté funcionando.`);
+      // Mostramos el error real en pantalla
+      setError(`Error de conexión: ${err.message}`);
     } finally {
       setLoading(false);
     }
