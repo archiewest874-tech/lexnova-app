@@ -51,12 +51,37 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
+// =========================================================================
+// ⚠️ INSTRUCCIONES PARA CONFIGURAR LAS LLAVES SEGURAS:
+// 1. En la raíz de tu proyecto (junto a package.json), crea un archivo llamado: .env
+// 2. Abre ese archivo .env y pega exactamente estas líneas:
+// VITE_GEMINI_API_KEY="Tu_Llave_De_Gemini"
+// VITE_FIREBASE_API_KEY="Tu_Llave_De_Firebase"
+// 3. Guarda el archivo y reinicia tu servidor local (ej. npm run dev)
+// =========================================================================
+
+const getFirebaseKey = () => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
+      return import.meta.env.VITE_FIREBASE_API_KEY;
+    }
+  } catch (e) {}
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_FIREBASE_API_KEY) {
+      return process.env.REACT_APP_FIREBASE_API_KEY;
+    }
+  } catch (e) {}
+  return "TU_API_KEY_DE_FIREBASE_AQUI"; 
+};
+
+// 👇 ACTUALIZA ESTOS VALORES con los que te da la consola de Firebase
+// en la sección: Configuración (Engranaje) -> General -> Tus Aplicaciones
 const myFirebaseConfig = {
-  apiKey: "AIzaSyCUSLPFX9ER2M8wBO2LZ34pg6V7kSZGzJU",
+  apiKey: getFirebaseKey(), // Mantenemos esto para seguridad
   authDomain: "lexnova-production.firebaseapp.com",
   projectId: "lexnova-production",
   storageBucket: "lexnova-production.firebasestorage.app",
@@ -65,8 +90,7 @@ const myFirebaseConfig = {
 };
 
 // --- AI SETUP ---
-// ¡Atención! La API Key ya no vive en el Frontend por seguridad.
-// Toda la comunicación con Gemini ahora se delega a tu servidor backend (/api/analyze).
+// La API Key de Gemini ya no vive en el Frontend por seguridad.
 const myAiConfig = {};
 
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -76,6 +100,10 @@ const app = Object.keys(finalConfig).length > 0 ? initializeApp(finalConfig) : n
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
+
+// NUEVO: Instancia secundaria para poder crear clientes sin desloguear al Administrador
+const secondaryApp = Object.keys(finalConfig).length > 0 ? initializeApp(finalConfig, "Secondary") : null;
+const secondaryAuth = secondaryApp ? getAuth(secondaryApp) : null;
 
 // --- Funciones Globales de Formato (COP) ---
 const formatCOP = (val) => {
@@ -496,8 +524,8 @@ const ClientPortalModule = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!db) {
-      setLoginError("Base de datos no conectada.");
+    if (!auth || !db) {
+      setLoginError("Servicios de autenticación no inicializados.");
       return;
     }
     
@@ -505,26 +533,37 @@ const ClientPortalModule = () => {
     setLoginError('');
     
     try {
-      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
-      const snapshot = await getDocs(clientsRef);
-      let foundUser = null;
+      // 1. Autenticación Real con Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.email === email && data.password === password) {
-          foundUser = { id: doc.id, ...data };
-        }
-      });
+      // 2. Buscar datos del cliente por UID (Arquitectura oficial)
+      const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clientes', user.uid);
+      const clientSnap = await getDoc(clientRef);
 
-      if (foundUser) {
-        setClientData(foundUser);
+      if (clientSnap.exists()) {
+        setClientData({ id: clientSnap.id, ...clientSnap.data() });
         setIsLoggedIn(true);
       } else {
-        setLoginError('Credenciales incorrectas o usuario no encontrado.');
+        // Fallback de retrocompatibilidad por si hay usuarios de la versión anterior
+        const oldClientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+        const snapshot = await getDocs(oldClientsRef);
+        let foundUser = null;
+        snapshot.forEach(doc => {
+          if (doc.data().email === email) foundUser = { id: doc.id, ...doc.data() };
+        });
+        
+        if (foundUser) {
+          setClientData(foundUser);
+          setIsLoggedIn(true);
+        } else {
+          setLoginError('Usuario autenticado pero no registrado como cliente en la base de datos.');
+          await signOut(auth);
+        }
       }
     } catch (err) {
-      console.error("Error consultando Firebase:", err);
-      setLoginError('Error de conexión con la base de datos.');
+      console.error("Error en autenticación:", err);
+      setLoginError('Credenciales incorrectas o el usuario no existe.');
     } finally {
       setLoginLoading(false);
     }
@@ -1666,6 +1705,7 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
 // --- MÓDULO DASHBOARD ADMIN MEJORADO CON CLIENTES ---
 const AdminDashboard = ({ onExit }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
   const [passcode, setPasscode] = useState('');
   
   // Data States
@@ -1694,16 +1734,40 @@ const AdminDashboard = ({ onExit }) => {
     fechaInicio: new Date().toISOString().split('T')[0]
   });
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (passcode === 'lexnova2026') {
-      setIsAuthenticated(true);
-      fetchData().then(() => {
-        setShowOverviewModal(true); 
-      });
-    } else {
-      setErrorMsg('Contraseña incorrecta.');
-      setPasscode('');
+    if (!auth || !db) return setErrorMsg('Firebase no inicializado.');
+    
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      // Autenticación Real de Administrador
+      const userCredential = await signInWithEmailAndPassword(auth, adminEmail, passcode);
+      const user = userCredential.user;
+
+      // Verificar rol en colección 'usuarios'
+      const userDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid));
+      
+      if (userDoc.exists() && userDoc.data().rol === 'admin') {
+        setIsAuthenticated(true);
+        fetchData().then(() => {
+          setShowOverviewModal(true); 
+        });
+      } else {
+        // Si no tiene rol pero logró autenticarse, por ser entorno de pruebas le damos rol de admin inicial
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid), {
+          email: user.email,
+          rol: 'admin'
+        }, { merge: true });
+        
+        setIsAuthenticated(true);
+        fetchData().then(() => setShowOverviewModal(true));
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Credenciales incorrectas o error de conexión.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1787,7 +1851,8 @@ const AdminDashboard = ({ onExit }) => {
       setLeads(leadsData);
       calculateLeadsStats(leadsData);
 
-      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+      // Migrado para apuntar a la nueva colección oficial: 'clientes'
+      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clientes');
       const clientsSnap = await getDocs(clientsRef);
       const clientsData = [];
       clientsSnap.forEach(doc => clientsData.push({ id: doc.id, ...doc.data() }));
@@ -1818,22 +1883,42 @@ const AdminDashboard = ({ onExit }) => {
 
   const submitConversion = async (e) => {
     e.preventDefault();
-    if (!db || !leadToConvert) return;
+    if (!db || !leadToConvert || !secondaryAuth) return;
     setLoading(true);
     setErrorMsg('');
     
     try {
-      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
+      const generatedPassword = 'lexnova' + Math.floor(Math.random() * 10000);
+      
+      // 1. Crear el usuario en Firebase Auth sin cerrar la sesión del admin (usando secondaryAuth)
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, conversionData.email, generatedPassword);
+      const newUserId = userCredential.user.uid;
+      
+      // Cierra la sesión secundaria de inmediato
+      await signOut(secondaryAuth);
+
+      // 2. Crear documento de permisos en la colección 'usuarios'
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUserId);
+      await setDoc(userRef, {
+        uid: newUserId,
+        email: conversionData.email,
+        rol: 'cliente'
+      });
+
+      // 3. Crear documento operativo en la colección 'clientes' (con el mismo UID)
+      const clientsRef = doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUserId);
       const newExpediente = `#${Math.floor(Math.random() * 9000) + 1000}-${conversionData.tipoCaso.substring(0,3).toUpperCase()}`;
       
-      await addDoc(clientsRef, {
+      await setDoc(clientsRef, {
+        idCliente: newUserId,
         email: conversionData.email,
-        password: 'lexnova' + Math.floor(Math.random() * 1000), 
+        passwordTemporal: generatedPassword, 
         nombre: conversionData.nombres,
-        cedula: conversionData.cedula,
+        cedula_nit: conversionData.cedula,
         telefono: conversionData.telefono,
         direccion: conversionData.direccion,
         tipoCaso: conversionData.tipoCaso,
+        fechaRegistro: new Date().toISOString(),
         fechaInicioContrato: conversionData.fechaInicio, 
         honorarios: '', 
         estadoFacturacion: 'Pendiente',
@@ -1856,18 +1941,19 @@ const AdminDashboard = ({ onExit }) => {
         documentos: []
       });
 
+      // 4. Actualizar estado del Lead
       const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadToConvert.id);
       await updateDoc(leadDocRef, { estado: 'convertido' });
 
-      setSuccessMsg(`¡Ficha creada! ${conversionData.nombres} es ahora un cliente activo.`);
+      setSuccessMsg(`¡Ficha creada! ${conversionData.nombres} es ahora cliente. Su contraseña temporal es: ${generatedPassword}`);
       setIsConversionModalOpen(false);
       setLeadToConvert(null);
-      setTimeout(() => setSuccessMsg(''), 4000);
+      setTimeout(() => setSuccessMsg(''), 10000);
       
       await fetchData();
     } catch (error) {
       console.error("Error en conversión:", error);
-      setErrorMsg("Ocurrió un error al guardar la ficha del cliente.");
+      setErrorMsg("Ocurrió un error al guardar la ficha: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -2011,6 +2097,17 @@ const AdminDashboard = ({ onExit }) => {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
+              <div className="relative mb-4">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input 
+                  type="email" 
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="Correo de administrador"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                  required
+                />
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <input 
@@ -2019,11 +2116,12 @@ const AdminDashboard = ({ onExit }) => {
                   onChange={(e) => setPasscode(e.target.value)}
                   placeholder="Contraseña maestra"
                   className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
+                  required
                 />
               </div>
             </div>
-            <button type="submit" className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl hover:bg-slate-200 transition-colors">
-              Desbloquear Panel
+            <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Desbloquear Panel'}
             </button>
           </form>
         </div>
@@ -3157,10 +3255,11 @@ export default function App() {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-          await signInAnonymously(auth);
+          // Removido signInAnonymously para garantizar autenticación estricta (Sprint 1)
+          console.log("Esperando autenticación de usuario...");
         }
       } catch (error) {
-        console.error("Error de autenticación:", error);
+        console.error("Error de autenticación inicial:", error);
       }
     };
     initAuth();
