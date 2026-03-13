@@ -66,10 +66,8 @@ const myFirebaseConfig = {
 
 // --- AI SETUP ---
 // ¡Atención! La API Key ya no vive en el Frontend por seguridad.
-// Toda la comunicación con Gemini ahora se delega a tu servidor backend (Vercel Functions).
-const myAiConfig = {
-  // Configuración delegada al backend (/api/analyze)
-};
+// Toda la comunicación con Gemini ahora se delega a tu servidor backend (/api/analyze).
+const myAiConfig = {};
 
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 const finalConfig = envConfig && Object.keys(envConfig).length > 0 ? envConfig : myFirebaseConfig;
@@ -313,6 +311,7 @@ const AILabModule = () => {
     setInputText(`Hechos: El día 15 de marzo de 2025, el trabajador Juan Pérez fue despedido de la empresa Industrias XYZ bajo la causal de "bajo rendimiento". Sin embargo, no se llevó a cabo ningún proceso disciplinario previo, ni se le otorgaron memorandos o descargos. El trabajador tenía fuero sindical vigente hasta diciembre de 2025. El empleado busca demandar por despido injustificado y violación al debido proceso laboral.`);
   };
 
+  // ESTA ES LA FUNCIÓN ACTUALIZADA QUE LLAMA A TU BACKEND (/api/analyze)
   const analyzeCase = async () => {
     if (!inputText.trim()) {
       setError("Por favor, ingresa los hechos del caso procesal.");
@@ -324,7 +323,7 @@ const AILabModule = () => {
     setResult(null);
 
     try {
-      // Llamas a tu propia función de Vercel (Backend seguro)
+      // Llamada al backend propio en Vercel
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -332,29 +331,27 @@ const AILabModule = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Error en el servidor backend: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error del servidor: ${response.status}`);
       }
 
       const data = await response.json();
 
-      // Manejo flexible dependiendo de cómo devuelva tu backend:
-      // Caso 1: Si el backend envía la respuesta cruda de Gemini (data.candidates...)
-      if (data.candidates && data.candidates.length > 0) {
-        const responseText = data.candidates[0].content?.parts?.[0]?.text;
-        const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        setResult(JSON.parse(cleanText));
-      } 
-      // Caso 2: Si tu backend ya procesó la data y envió el objeto JSON limpio directamente
-      else if (data.resumen_ejecutivo) {
+      // Procesamos la respuesta limpia del backend
+      if (data.resumen_ejecutivo) {
         setResult(data);
-      } 
-      else {
-        throw new Error("Estructura de respuesta del backend no reconocida.");
+      } else if (data.candidates && data.candidates.length > 0) {
+         const responseText = data.candidates[0].content?.parts?.[0]?.text;
+         const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+         setResult(JSON.parse(cleanText));
+      } else {
+        throw new Error("Formato de respuesta desconocido.");
       }
 
     } catch (err) {
       console.error("Error al analizar el caso:", err);
-      setError("No se pudo conectar con el servidor seguro (/api/analyze). Verifica que tu backend esté configurado y desplegado correctamente.");
+      // ESTE ES EL NUEVO MENSAJE DE ERROR
+      setError(`Error de conexión: ${err.message}. Verifica que /api/analyze esté funcionando.`);
     } finally {
       setLoading(false);
     }
@@ -531,23 +528,19 @@ const ClientPortalModule = () => {
     setUploadingDocId(reqId);
     
     try {
-      // 1. Marcar como subido en la lista de requeridos
       const updatedReqs = (clientData.documentosRequeridos || []).map(req =>
         req.id === reqId ? { ...req, subido: true, fecha: new Date().toLocaleDateString() } : req
       );
       
-      // 2. Añadir al repositorio general
       const newDoc = { name: reqNombre + '.pdf', date: new Date().toLocaleDateString() };
       const updatedDocs = [...(clientData.documentos || []), newDoc];
 
-      // 3. Guardar en base de datos
       const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', clientData.id);
       await updateDoc(clientRef, {
         documentosRequeridos: updatedReqs,
         documentos: updatedDocs
       });
 
-      // 4. Actualizar vista local
       setClientData({ 
         ...clientData, 
         documentosRequeridos: updatedReqs, 
@@ -611,18 +604,13 @@ const ClientPortalModule = () => {
     setLoginLoading(false);
   };
 
-  // Cálculos para la lista de chequeo
   const reqDocs = clientData?.documentosRequeridos || [];
   const completedDocs = reqDocs.filter(r => r.subido).length;
   const docsProgress = reqDocs.length ? Math.round((completedDocs / reqDocs.length) * 100) : 0;
 
-  // Cálculos financieros
   const honorariosNum = parseCOP(clientData?.honorarios);
   const recaudoNum = (clientData?.pagos || []).reduce((sum, p) => sum + parseCOP(p.monto), 0);
   const saldoPendienteNum = honorariosNum - recaudoNum;
-
-  // Total de horas invertidas
-  const horasTotales = (clientData?.registroTiempos || []).reduce((sum, entry) => sum + Number(entry.horas), 0);
 
   return (
     <section id="portal-cliente" className="py-24 bg-slate-950 relative overflow-hidden">
@@ -990,7 +978,7 @@ const ClientPortalModule = () => {
                                 <td className="p-4 whitespace-nowrap">{pago.fecha}</td>
                                 <td className="p-4">
                                   <span className="text-white font-medium block">{pago.descripcion}</span>
-                                </td>
+                                 </td>
                                 <td className="p-4 text-right font-mono text-cyan-400">
                                   {formatCOP(pago.monto)}
                                 </td>
@@ -2755,7 +2743,7 @@ const AdminDashboard = ({ onExit }) => {
                                 <td className="p-3 text-sm">{entry.descripcion}</td>
                                 <td className="p-3 text-right font-mono text-purple-400">
                                   {formatCOP(entry.monto)}
-                                </td>
+                                 </td>
                                 <td className="p-3 text-center">
                                   <button onClick={() => handleDeletePlanEntry(entry.id)} className="text-red-400 hover:text-red-300 p-1" title="Eliminar hito">
                                     <X className="w-4 h-4" />
