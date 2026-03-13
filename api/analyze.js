@@ -7,11 +7,12 @@ export default async function handler(req, res) {
   const { inputText } = req.body;
   
   // 2. Leer la API Key de forma 100% segura desde Vercel
-  // Usará la variable que configuraste en el panel de Vercel (Environment Variables)
-  const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY || process.env.GEMINI_API_KEY_SECURE; 
+  // Usamos estrictamente la variable segura que configuraste
+  const apiKey = process.env.GEMINI_API_KEY_SECURE; 
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API Key no detectada en el servidor de Vercel.' });
+    // Mensaje de error modificado para saber exactamente de dónde viene
+    return res.status(500).json({ error: 'Falta la variable GEMINI_API_KEY_SECURE en Vercel.' });
   }
 
   // 3. Configurar la petición a Google Gemini
