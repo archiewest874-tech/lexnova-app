@@ -1,5 +1,5 @@
+// 1. Asegurarnos de que solo acepte peticiones POST
 export default async function handler(req, res) {
-  // 1. Asegurarnos de que solo acepte peticiones POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
