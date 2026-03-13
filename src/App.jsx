@@ -65,8 +65,19 @@ const myFirebaseConfig = {
 };
 
 // --- AI SETUP ---
+let localApiKey = "";
+try {
+  // Intenta leer la variable de entorno en Vercel o Local (Vite o Create React App)
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+    localApiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  } else if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_GEMINI_API_KEY) {
+    localApiKey = process.env.REACT_APP_GEMINI_API_KEY;
+  }
+} catch (e) {}
+
 const myAiConfig = {
-  geminiApiKey: "" 
+  // Si existe la variable enmascarada la usa, si no, usa "" para el simulador
+  geminiApiKey: localApiKey || "" 
 };
 
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -388,7 +399,7 @@ const AILabModule = () => {
       }
     } catch (err) {
       if (err.message === "API_KEY_INVALID" || err.message.includes("Error de autenticación")) {
-        setError("La API Key configurada es inválida o no tiene permisos.");
+        setError("Error de API Key. Si estás en Vercel/Local, asegúrate de configurar VITE_GEMINI_API_KEY en tus variables de entorno.");
       } else if (err.message.includes("Error de cliente: 404")) {
          setError(`Error 404: El modelo ${model} no está disponible con esta configuración de API Key.`);
       } else {
@@ -1382,9 +1393,16 @@ const CTASection = ({ onOpenModal }) => {
 const Footer = ({ onOpenLegal, onOpenAdmin }) => (
   <footer className="bg-slate-950 py-12 border-t border-white/10">
     <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="flex items-center gap-2">
-        <Scale className="text-slate-500 w-6 h-6" />
-        <span className="text-slate-400 font-semibold text-lg">LexNova</span>
+      <div 
+        className="flex items-center gap-2 cursor-pointer group"
+        onClick={() => {
+          const container = document.getElementById('main-scroll-container');
+          if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        title="Volver al inicio"
+      >
+        <Scale className="text-slate-500 w-6 h-6 group-hover:text-cyan-400 transition-colors" />
+        <span className="text-slate-400 font-semibold text-lg group-hover:text-white transition-colors">LexNova</span>
       </div>
       <p className="text-slate-600 text-sm text-center md:text-left flex-1 md:ml-8">
         © 2026 LexNova Digital Experiences. Todos los derechos reservados.
