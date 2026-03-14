@@ -56,8 +56,7 @@ import {
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signOut,
-  signInWithCustomToken
+  signOut 
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -67,9 +66,7 @@ import {
   updateDoc, 
   doc, 
   getDoc, 
-  setDoc,
-  query,
-  where
+  setDoc 
 } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION HELPERS ---
@@ -109,7 +106,7 @@ if (myFirebaseConfig.apiKey) {
 
 // --- Funciones Globales de Formato ---
 const formatCOP = (val) => {
-  if (!val) return '';
+  if (!val) return '$ 0';
   const num = Number(val.toString().replace(/[^0-9]/g, ''));
   if (isNaN(num) || num === 0) return '$ 0';
   return '$ ' + num.toLocaleString('es-CO');
@@ -150,7 +147,7 @@ const scrollToSection = (e, targetId) => {
   }
 };
 
-// --- UI COMPONENTS ---
+// --- UI COMPONENTS (LANDING) ---
 
 const NavBar = ({ onOpenModal }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -186,19 +183,6 @@ const NavBar = ({ onOpenModal }) => {
           {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
         </button>
       </div>
-      {isMobileMenuOpen && (
-        <div className="lg:hidden absolute top-20 left-0 w-full bg-slate-900 border-b border-white/10 shadow-2xl animate-fade-in-down origin-top">
-          <div className="flex flex-col px-6 py-6 gap-5">
-            <a href="#ecosistema" onClick={(e) => handleNavClick(e, 'ecosistema')} className="text-base font-medium text-slate-300 hover:text-cyan-400">Ecosistema</a>
-            <a href="#soluciones" onClick={(e) => handleNavClick(e, 'soluciones')} className="text-base font-medium text-slate-300 hover:text-cyan-400">Soluciones</a>
-            <a href="#laboratorio-ia" onClick={(e) => handleNavClick(e, 'laboratorio-ia')} className="text-base font-medium text-slate-300 hover:text-cyan-400 flex items-center gap-2"><Sparkles className="w-4 h-4 text-cyan-400"/> IA Legal</a>
-            <a href="#portal-cliente" onClick={(e) => handleNavClick(e, 'portal-cliente')} className="text-base font-medium text-slate-300 hover:text-cyan-400">Portal Clientes</a>
-            <hr className="border-white/10 my-2" />
-            <button onClick={(e) => handleNavClick(e, 'portal-cliente')} className="flex items-center gap-3 text-base font-medium text-slate-300 hover:text-cyan-400"><User className="w-5 h-5" /> Ingresar al Portal</button>
-            <button onClick={() => { setIsMobileMenuOpen(false); onOpenModal(); }} className="w-full bg-white/10 hover:bg-white/20 text-white py-3.5 rounded-xl font-bold mt-2 flex justify-center items-center gap-2">Solicitar Atención <ChevronRight className="w-5 h-5" /></button>
-          </div>
-        </div>
-      )}
     </nav>
   );
 };
@@ -221,7 +205,6 @@ const Hero = ({ onOpenModal }) => (
         <button onClick={onOpenModal} className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-full font-semibold text-lg transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)]">
           Iniciar Evolución Digital
         </button>
-        <button onClick={(e) => scrollToSection(e, 'casos-exito')} className="w-full sm:w-auto px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-full font-semibold text-lg transition-all flex items-center justify-center gap-2">Ver Casos de Éxito</button>
       </div>
     </div>
   </section>
@@ -237,10 +220,6 @@ const ExplainerCards = () => {
   return (
     <section id="ecosistema" className="py-24 relative z-10">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-16 reveal-on-scroll opacity-0 translate-y-10 transition-all duration-700">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">El Fin del Papel y la Incertidumbre</h2>
-          <p className="text-slate-400 max-w-2xl mx-auto">Un ecosistema diseñado para mitigar riesgos procesales y maximizar la rentabilidad.</p>
-        </div>
         <div className="grid md:grid-cols-3 gap-6">
           {cards.map((card, idx) => (
             <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-500 group reveal-on-scroll opacity-0 translate-y-10" style={{ transitionDelay: `${idx * 150}ms` }}>
@@ -281,123 +260,17 @@ const AILabModule = () => {
 
   return (
     <section id="laboratorio-ia" className="py-24 bg-slate-900 border-y border-white/5 relative overflow-hidden">
-      <div className="max-w-5xl mx-auto px-6 relative z-10">
-        <div className="text-center mb-12 reveal-on-scroll opacity-0 translate-y-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-400 text-sm font-bold mb-6"><Sparkles className="w-4 h-4" /> <span>IA Legal Lab</span></div>
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Laboratorio de IA Legal</h2>
-        </div>
-        <div className="grid md:grid-cols-2 gap-8 reveal-on-scroll opacity-0 translate-y-10">
+      <div className="max-w-5xl mx-auto px-6 relative z-10 text-center">
+        <h2 className="text-3xl md:text-5xl font-bold text-white mb-12">Laboratorio de IA Legal</h2>
+        <div className="grid md:grid-cols-2 gap-8">
           <div className="bg-slate-950 border border-white/10 rounded-2xl p-6 flex flex-col">
-            <h3 className="text-white font-semibold mb-6 flex items-center gap-2"><FileText className="w-5 h-5 text-slate-400" /> Hechos del Expediente</h3>
-            <textarea className="w-full bg-slate-900 border border-white/5 rounded-xl p-4 text-slate-300 h-48 mb-6 outline-none focus:ring-2 focus:ring-cyan-500/50" placeholder="Describe los hechos jurídicos..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
-            <button onClick={analyzeCase} disabled={loading} className="w-full py-4 bg-white text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Analizar con IA</button>
+            <textarea className="w-full bg-slate-900 border border-white/5 rounded-xl p-4 text-slate-300 h-48 mb-6 outline-none focus:ring-2 focus:ring-cyan-500/50" placeholder="Hechos jurídicos..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
+            <button onClick={analyzeCase} disabled={loading} className="w-full py-4 bg-white text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Analizar con IA</button>
           </div>
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 rounded-2xl p-6 flex flex-col min-h-[400px]">
-            {!result && !error && !loading && <div className="flex-1 flex flex-col items-center justify-center text-slate-500 opacity-60"><Cpu className="w-16 h-16 mb-4" /> <p>El análisis aparecerá aquí.</p></div>}
-            {result && (
-              <div className="animate-fade-in space-y-6">
-                <div><h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Resumen Ejecutivo</h4><p className="text-slate-300 text-sm leading-relaxed">{result.resumen_ejecutivo}</p></div>
-                <div><h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Nivel de Riesgo</h4><p className="text-lg font-bold text-white">{result.nivel_riesgo}</p></div>
-              </div>
-            )}
-            {error && <p className="text-red-400 text-sm bg-red-400/10 p-4 rounded-xl">{error}</p>}
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 flex flex-col min-h-[400px]">
+             {result ? <div className="text-left"><p className="text-cyan-400 font-bold mb-2">Resultado:</p><p className="text-slate-300">{result.resumen_ejecutivo}</p></div> : <div className="m-auto text-slate-500">El análisis aparecerá aquí.</div>}
           </div>
         </div>
-      </div>
-    </section>
-  );
-};
-
-const ClientPortalModule = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState('resumen');
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('cliente@ejemplo.com');
-  const [password, setPassword] = useState('123456');
-  const [clientData, setClientData] = useState(null);
-  const [error, setError] = useState('');
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (!auth) { setError("Firebase no configurado."); return; }
-    setLoading(true); setError('');
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists() && userSnap.data().rol === 'cliente') {
-        const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clientes', user.uid);
-        const clientSnap = await getDoc(clientRef);
-        if (clientSnap.exists()) {
-          setClientData({ id: clientSnap.id, ...clientSnap.data() });
-          setIsLoggedIn(true);
-        } else { setError("Perfil de cliente no encontrado en 'clientes'."); await signOut(auth); }
-      } else { setError("Acceso restringido. Portal exclusivo para clientes."); await signOut(auth); }
-    } catch (err) { setError("Credenciales inválidas."); } finally { setLoading(false); }
-  };
-
-  return (
-    <section id="portal-cliente" className="py-24 bg-slate-950 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-400 text-sm font-bold mb-6"><Lock className="w-4 h-4" /> <span>Transparencia y Seguridad (Ley 527/99)</span></div>
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Portal de Acceso a Clientes</h2>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto">Tus clientes interactúan con sus expedientes y estado de facturación en tiempo real.</p>
-        </div>
-
-        {!isLoggedIn ? (
-          <div className="max-w-md mx-auto bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-2xl mx-auto flex items-center justify-center mb-4"><User className="w-8 h-8 text-white" /></div>
-              <h3 className="text-2xl font-bold text-white">Acceso Seguro</h3>
-            </div>
-            {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center">{error}</div>}
-            <form onSubmit={handleLogin} className="space-y-4">
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white outline-none focus:border-cyan-400" placeholder="Email" required />
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white outline-none focus:border-cyan-400" placeholder="Contraseña" required />
-              <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-xl">{loading ? <Loader2 className="animate-spin mx-auto"/> : 'Ingresar al Portal'}</button>
-            </form>
-          </div>
-        ) : (
-          <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[600px] shadow-2xl">
-            {/* Sidebar del Cliente */}
-            <div className="w-full md:w-64 bg-slate-950/50 border-r border-white/5 p-6 flex flex-col">
-              <div className="flex items-center gap-3 mb-10">
-                <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50"><User className="w-5 h-5 text-cyan-400" /></div>
-                <div className="overflow-hidden">
-                  <p className="text-sm font-bold text-white truncate">{clientData?.nombre || 'Cliente'}</p>
-                  <p className="text-[10px] text-slate-500">Expediente {clientData?.expediente}</p>
-                </div>
-              </div>
-              <nav className="space-y-2 flex-1">
-                {['resumen', 'documentos', 'facturacion'].map(t => (
-                  <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === t ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-white'}`}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </nav>
-              <button onClick={() => { setIsLoggedIn(false); signOut(auth); }} className="mt-8 text-red-400 hover:bg-red-400/10 p-3 rounded-xl text-sm flex items-center gap-2"><LogOut className="w-4 h-4"/> Salir</button>
-            </div>
-            {/* Contenido del Cliente */}
-            <div className="flex-1 p-10 bg-slate-900/50">
-               <h3 className="text-2xl font-bold text-white mb-8 capitalize">{activeTab}</h3>
-               {activeTab === 'resumen' && (
-                 <div className="space-y-6 animate-fade-in">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5"><p className="text-xs text-slate-500 font-bold mb-1">Estado</p><p className="text-emerald-400 font-bold">{clientData?.estadoActual}</p></div>
-                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5"><p className="text-xs text-slate-500 font-bold mb-1">Audiencia</p><p className="text-white font-bold">{clientData?.proximaAudiencia}</p></div>
-                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5"><p className="text-xs text-slate-500 font-bold mb-1">Juzgado</p><p className="text-white font-bold">{clientData?.juzgado}</p></div>
-                    </div>
-                 </div>
-               )}
-               {activeTab === 'documentos' && <div className="text-slate-500 italic">Módulo de documentos en línea...</div>}
-               {activeTab === 'facturacion' && <div className="text-slate-500 italic">Módulo de pagos y honorarios...</div>}
-            </div>
-          </div>
-        )}
       </div>
     </section>
   );
@@ -416,7 +289,7 @@ const ComparisonModule = () => {
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div className="reveal-on-scroll opacity-0 translate-y-10">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Herramientas Especializadas.</h2>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Soluciones Integrales</h2>
             <div className="flex flex-col gap-4">
               {Object.keys(content).map((key) => (
                 <button key={key} onClick={() => setActiveTab(key)} className={`text-left p-6 rounded-xl border transition-all ${activeTab === key ? 'bg-white/10 border-white/20' : 'bg-transparent border-transparent hover:bg-white/5'}`}>
@@ -425,8 +298,8 @@ const ComparisonModule = () => {
               ))}
             </div>
           </div>
-          <div className="relative h-[400px] reveal-on-scroll opacity-0 translate-y-10 delay-200">
-            <div className={`absolute inset-0 rounded-3xl bg-slate-950 border border-white/10 p-10 flex flex-col justify-center`}>
+          <div className="relative h-[400px]">
+            <div className={`absolute inset-0 rounded-3xl bg-slate-950 border border-white/10 p-10 flex flex-col justify-center animate-fade-in`}>
               <h3 className="text-3xl font-bold text-white mb-8">{content[activeTab].title}</h3>
               <ul className="space-y-4">
                 {content[activeTab].points.map((point, i) => <li key={i} className="flex items-center gap-4 text-slate-300 text-lg"><CheckCircle2 className="w-6 h-6 text-cyan-400"/> {point}</li>)}
@@ -453,67 +326,269 @@ const KeyInsights = () => (
 );
 
 const SuccessStories = () => (
-  <section id="casos-exito" className="py-24 bg-slate-900 border-y border-white/5">
+  <section id="casos-exito" className="py-24 bg-slate-900">
     <div className="max-w-7xl mx-auto px-6">
-      <h2 className="text-3xl md:text-5xl font-bold text-white text-center mb-16">Resultados Reales.</h2>
-      <div className="grid lg:grid-cols-3 gap-8">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-slate-950 border border-white/10 rounded-3xl p-8 hover:border-cyan-500/50 transition-all">
-            <Quote className="text-cyan-400 mb-4" />
-            <p className="text-slate-400">"LexNova transformó nuestra firma. Ahora todo es digital y automático."</p>
-            <p className="text-white font-bold mt-6">Firma Jurídica {i}</p>
-          </div>
-        ))}
-      </div>
+      <h2 className="text-3xl font-bold text-white text-center mb-16 italic">Resultados que avalan nuestra tecnología.</h2>
     </div>
   </section>
 );
 
-const ScrollStory = () => (
-  <section className="py-24 max-w-4xl mx-auto px-6">
-    <h2 className="text-3xl md:text-5xl font-bold text-white text-center mb-16">El Paradigma de 2026</h2>
-    <div className="space-y-12">
-      <div className="flex gap-6"><div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 font-bold shrink-0">1</div><div><h3 className="text-2xl font-bold text-white mb-2">Notificaciones Electrónicas</h3><p className="text-slate-400">Trazabilidad absoluta bajo Ley 527/99.</p></div></div>
-      <div className="flex gap-6"><div className="w-12 h-12 rounded-full bg-cyan-400/20 flex items-center justify-center text-cyan-400 font-bold shrink-0">2</div><div><h3 className="text-2xl font-bold text-white mb-2">Ciberseguridad</h3><p className="text-slate-400">Encriptación militar para el secreto profesional.</p></div></div>
-    </div>
-  </section>
-);
+const ClientPortalModule = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeTab, setActiveTab] = useState('resumen');
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [clientData, setClientData] = useState(null);
+  const [error, setError] = useState('');
 
-const CTASection = ({ onOpenModal }) => (
-  <section className="py-24 text-center relative overflow-hidden">
-    <div className="absolute inset-0 bg-blue-600/5" />
-    <h2 className="text-4xl md:text-6xl font-extrabold text-white mb-6">Lidera la Práctica Jurídica.</h2>
-    <button onClick={onOpenModal} className="px-10 py-5 bg-white text-slate-950 rounded-full font-bold shadow-lg flex items-center gap-3 mx-auto group">Solicitar Demo <ArrowRight className="group-hover:translate-x-1 transition-transform" /></button>
-  </section>
-);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!auth) return;
+    setLoading(true); setError('');
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists() && userSnap.data().rol === 'cliente') {
+        const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clientes', user.uid);
+        const clientSnap = await getDoc(clientRef);
+        if (clientSnap.exists()) {
+          setClientData({ id: clientSnap.id, ...clientSnap.data() });
+          setIsLoggedIn(true);
+        } else { setError("Perfil no encontrado."); await signOut(auth); }
+      } else { setError("Portal exclusivo para clientes."); await signOut(auth); }
+    } catch (err) { setError("Error en credenciales."); } finally { setLoading(false); }
+  };
 
-const Footer = ({ onOpenLegal, onOpenAdmin }) => (
-  <footer className="bg-slate-950 py-12 border-t border-white/10">
-    <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="flex items-center gap-2 font-bold text-lg text-slate-400 cursor-pointer" onClick={() => window.scrollTo({top:0, behavior:'smooth'})}>LexNova</div>
-      <p className="text-slate-600 text-sm">© 2026 LexNova Digital Experiences.</p>
-      <div className="flex gap-6 text-sm text-slate-500">
-        <button onClick={() => onOpenLegal('privacidad')}>Privacidad</button>
-        <button onClick={() => onOpenLegal('terminos')}>Términos</button>
-        <button onClick={onOpenAdmin} className="text-cyan-400 flex items-center gap-1 font-bold"><ShieldCheck size={14}/> Portal Admin</button>
-      </div>
-    </div>
-  </footer>
-);
-
-const LegalModal = ({ isOpen, onClose, type }) => {
-  if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl animate-fade-in-up">
-        <h3 className="text-2xl font-bold text-white mb-4 capitalize">{type}</h3>
-        <p className="text-slate-400 text-sm leading-relaxed">Contenido legal detallado según Ley 1581 de 2012 y CGP...</p>
-        <button onClick={onClose} className="mt-8 px-6 py-2 bg-white/10 text-white rounded-lg">Cerrar</button>
+    <section id="portal-cliente" className="py-24 bg-slate-950">
+      <div className="max-w-7xl mx-auto px-6">
+        <h2 className="text-center text-3xl font-bold text-white mb-12">Portal Clientes</h2>
+        {!isLoggedIn ? (
+          <div className="max-w-md mx-auto bg-slate-900 p-8 rounded-3xl border border-white/10">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 p-3 rounded-xl border border-white/10" placeholder="Email" required />
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-950 p-3 rounded-xl border border-white/10" placeholder="Contraseña" required />
+              <button className="w-full py-3 bg-cyan-500 text-slate-950 font-bold rounded-xl">{loading ? '...' : 'Entrar'}</button>
+            </form>
+          </div>
+        ) : (
+          <div className="bg-slate-900 rounded-3xl p-10 border border-white/10">
+            <p className="text-white font-bold text-xl">Bienvenido, {clientData?.nombre}</p>
+          </div>
+        )}
       </div>
+    </section>
+  );
+};
+
+// --- MÓDULO DASHBOARD ADMIN INTEGRAL (RESTAURADO) ---
+const AdminDashboard = ({ onExit }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [passcode, setPasscode] = useState('');
+  const [viewMode, setViewMode] = useState('leads'); 
+  const [leads, setLeads] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [showOverviewModal, setShowOverviewModal] = useState(false); 
+  
+  const [leadsStats, setLeadsStats] = useState({ total: 0, topInterest: '-' });
+  const [clientsStats, setClientsStats] = useState({ total: 0, totalHonorarios: 0, totalRecaudo: 0 });
+
+  const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
+  const [leadToConvert, setLeadToConvert] = useState(null);
+  const [conversionData, setConversionData] = useState({ nombres: '', email: '', telefono: '' });
+
+  const [editingClient, setEditingClient] = useState(null);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clientModalTab, setClientModalTab] = useState('general');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!auth) return;
+    setLoading(true); setErrorMsg('');
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, adminEmail, passcode);
+      const user = userCredential.user;
+      const userDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid));
+      if (userDoc.exists() && userDoc.data().rol === 'admin') {
+        setIsAuthenticated(true);
+        fetchData();
+      } else {
+        setErrorMsg('Denegado.');
+        await signOut(auth);
+      }
+    } catch (err) { setErrorMsg('Inválido.'); } finally { setLoading(false); }
+  };
+
+  const fetchData = async () => {
+    if (!db) return;
+    setLoading(true);
+    try {
+      const leadsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'leads'));
+      const lData = leadsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setLeads(lData);
+      
+      const clientsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'clientes'));
+      const cData = clientsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setClients(cData);
+
+      const activeLeads = lData.filter(l => l.estado !== 'convertido');
+      setLeadsStats({ total: activeLeads.length, topInterest: 'IA Legal' });
+      
+      const totalHon = cData.reduce((s, c) => s + parseCOP(c.honorarios), 0);
+      const totalRec = cData.reduce((s, c) => s + (c.pagos?.reduce((ps, p) => ps + parseCOP(p.monto), 0) || 0), 0);
+      setClientsStats({ total: cData.length, totalHonorarios: totalHon, totalRecaudo: totalRec });
+    } catch (error) { console.error(error); } finally { setLoading(false); }
+  };
+
+  const convertLead = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const tempPass = "Lex" + Math.floor(1000 + Math.random() * 9000);
+      const userCred = await createUserWithEmailAndPassword(secondaryAuth, conversionData.email, tempPass);
+      const newUid = userCred.user.uid;
+      await signOut(secondaryAuth);
+
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUid), { uid: newUid, email: conversionData.email, rol: 'cliente' });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUid), { 
+        idCliente: newUid, nombre: conversionData.nombres, email: conversionData.email, telefono: conversionData.telefono,
+        expediente: "#"+Math.floor(1000+Math.random()*9000), estadoActual: "Nuevo Cliente"
+      });
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadToConvert.id), { estado: 'convertido' });
+
+      setSuccessMsg(`Cliente creado: ${tempPass}`);
+      setIsConversionModalOpen(false);
+      fetchData();
+    } catch (err) { alert(err.message); } finally { setLoading(false); }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-slate-900 border border-white/10 p-8 rounded-3xl">
+           <h2 className="text-2xl font-bold text-white text-center mb-6">Admin Login</h2>
+           <form onSubmit={handleLogin} className="space-y-4">
+              <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" placeholder="Email" required />
+              <input type="password" value={passcode} onChange={e => setPasscode(e.target.value)} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" placeholder="Passcode" required />
+              <button type="submit" className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">Entrar</button>
+           </form>
+           <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm">Volver</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-50 p-6 font-sans">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-10 pb-6 border-b border-white/10">
+          <div><h1 className="text-3xl font-bold flex items-center gap-3"><Database className="text-cyan-400" /> Admin LexNova</h1></div>
+          <div className="flex gap-4">
+            <button onClick={() => setShowOverviewModal(true)} className="px-4 py-2 bg-white/10 border border-white/10 rounded-lg text-sm font-bold flex items-center gap-2"><LayoutDashboard className="w-4 h-4" /> Resumen Ejecutivo</button>
+            <button onClick={() => { setIsAuthenticated(false); signOut(auth); }} className="px-4 py-2 bg-red-500/10 text-red-400 rounded-lg text-sm">Salir</button>
+          </div>
+        </div>
+
+        {/* TABS DE NAVEGACIÓN */}
+        <div className="flex bg-slate-900 p-1.5 rounded-xl mb-8 w-fit border border-white/10">
+          <button onClick={() => setViewMode('leads')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'leads' ? 'bg-white/10 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}><Users className="w-4 h-4" /> Prospectos ({leads.filter(l => l.estado !== 'convertido').length})</button>
+          <button onClick={() => setViewMode('clients')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'clients' ? 'bg-indigo-500/20 text-indigo-300 shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}><FolderOpen className="w-4 h-4" /> Clientes ({clients.length})</button>
+        </div>
+
+        {/* TABLAS */}
+        <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-950 border-b border-white/5 text-slate-400">
+               <tr><th className="p-4">Titular</th><th className="p-4">Contacto</th><th className="p-4 text-right">Acción</th></tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {viewMode === 'leads' ? (
+                leads.filter(l => l.estado !== 'convertido').map(l => (
+                  <tr key={l.id} className="hover:bg-white/[0.02]">
+                    <td className="p-4 font-bold">{l.name}</td>
+                    <td className="p-4">{l.email}</td>
+                    <td className="p-4 text-right"><button onClick={() => { setLeadToConvert(l); setConversionData({ nombres: l.name, email: l.email, telefono: l.phone }); setIsConversionModalOpen(true); }} className="bg-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold">Convertir</button></td>
+                  </tr>
+                ))
+              ) : (
+                clients.map(c => (
+                  <tr key={c.id} className="hover:bg-white/[0.02]">
+                    <td className="p-4 font-bold">{c.nombre}</td>
+                    <td className="p-4">{c.expediente}</td>
+                    <td className="p-4 text-right"><button onClick={() => { setEditingClient(c); setIsClientModalOpen(true); }} className="bg-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold">Gestionar</button></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL CONVERSIÓN */}
+      {isConversionModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-md p-8 shadow-2xl animate-fade-in-up">
+            <h3 className="text-xl font-bold text-white mb-6 italic">Formalización de Cliente</h3>
+            <form onSubmit={convertLead} className="space-y-4">
+              <input value={conversionData.nombres} onChange={e => setConversionData({...conversionData, nombres: e.target.value})} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" placeholder="Nombre" required />
+              <input type="email" value={conversionData.email} onChange={e => setConversionData({...conversionData, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" placeholder="Email" required />
+              <button type="submit" disabled={loading} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl">{loading ? 'Procesando...' : 'Crear Cuenta'}</button>
+              <button type="button" onClick={() => setIsConversionModalOpen(false)} className="w-full text-slate-500 text-sm">Cerrar</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESUMEN EJECUTIVO (RESTAURADO) */}
+      {showOverviewModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md">
+          <div className="relative w-full max-w-5xl bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-white/10 bg-slate-950 flex justify-between items-center">
+              <div className="flex items-center gap-4"><Target className="text-cyan-400" /><h3 className="text-2xl font-bold text-white italic">Executive Analytics</h3></div>
+              <button onClick={() => setShowOverviewModal(false)} className="text-slate-400 hover:text-white"><X /></button>
+            </div>
+            <div className="p-8 overflow-y-auto space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-slate-950 border border-white/5 p-6 rounded-2xl">
+                   <p className="text-slate-500 text-[10px] font-bold uppercase mb-2">Salud de Cartera</p>
+                   <p className="text-3xl font-extrabold text-emerald-400">{formatCOP(clientsStats.totalRecaudo)}</p>
+                </div>
+                <div className="bg-slate-950 border border-white/5 p-6 rounded-2xl">
+                   <p className="text-slate-500 text-[10px] font-bold uppercase mb-2">Demandas en IA</p>
+                   <p className="text-3xl font-extrabold">{leadsStats.total}</p>
+                </div>
+                <div className="bg-slate-950 border border-white/5 p-6 rounded-2xl">
+                   <p className="text-slate-500 text-[10px] font-bold uppercase mb-2">Casos Activos</p>
+                   <p className="text-3xl font-extrabold">{clientsStats.total}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                 <div className="bg-white/5 p-12 rounded-2xl border border-white/5 text-center text-slate-500 italic">Métrica de Distribución Visual</div>
+                 <div className="bg-white/5 p-12 rounded-2xl border border-white/5 text-center text-slate-500 italic">Métrica de Crecimiento Mensual</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+const Footer = ({ onOpenAdmin }) => (
+  <footer className="bg-slate-950 py-12 border-t border-white/10">
+    <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+      <p className="text-slate-600 text-sm">© 2026 LexNova Digital Experiences.</p>
+      <button onClick={onOpenAdmin} className="text-cyan-400 flex items-center gap-1 font-bold text-xs"><ShieldCheck size={14}/> Acceso Admin</button>
+    </div>
+  </footer>
+);
 
 const RegistrationModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', interest: '' });
@@ -522,7 +597,7 @@ const RegistrationModal = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!db) { alert("Base de datos no disponible."); return; }
+    if (!db) return;
     setLoading(true);
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leads'), {
@@ -530,162 +605,21 @@ const RegistrationModal = ({ isOpen, onClose }) => {
       });
       setSuccess(true);
       setTimeout(() => { onClose(); setSuccess(false); setFormData({name:'', email:'', phone:'', interest:''}); }, 2000);
-    } catch (err) { alert("Error al registrar."); } finally { setLoading(false); }
+    } catch (err) { alert("Error."); } finally { setLoading(false); }
   };
 
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
-        {!success ? (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div className="bg-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-lg">
+        {success ? <div className="text-emerald-400 text-center font-bold">¡Enviado!</div> : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <h3 className="text-2xl font-bold text-white mb-4">Solicitar Atención</h3>
-            <input required placeholder="Nombre" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-            <input required type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-            <input required placeholder="Teléfono" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-            <select required className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.interest} onChange={e => setFormData({...formData, interest: e.target.value})}>
-              <option value="">Interés...</option>
-              <option value="ia-legal">IA Legal</option>
-              <option value="vigilancia">Vigilancia</option>
-            </select>
-            <button type="submit" disabled={loading} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl">{loading ? 'Enviando...' : 'Enviar Solicitud'}</button>
+            <h3 className="text-xl font-bold text-white mb-4 italic">Solicitud de Servicio</h3>
+            <input required placeholder="Nombre" className="w-full bg-slate-950 p-3 rounded-xl border border-white/10" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+            <input required type="email" placeholder="Email" className="w-full bg-slate-950 p-3 rounded-xl border border-white/10" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            <button className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl">Enviar</button>
           </form>
-        ) : <div className="text-center py-10 text-emerald-400 font-bold">¡Solicitud Enviada!</div>}
-      </div>
-    </div>
-  );
-};
-
-// --- MÓDULO DASHBOARD ADMIN MEJORADO ---
-const AdminDashboard = ({ onExit }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('admin@lexnova.com');
-  const [passcode, setPasscode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [leads, setLeads] = useState([]);
-  const [viewMode, setViewMode] = useState('leads'); // 'leads' o 'clients'
-
-  const handleAdminLogin = async (e) => {
-    e.preventDefault();
-    if (!auth) { setErrorMsg("Firebase no disponible."); return; }
-    setLoading(true); setErrorMsg('');
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, adminEmail, passcode);
-      const user = userCredential.user;
-      
-      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists() && userSnap.data().rol === 'admin') {
-        setIsAuthenticated(true);
-        fetchLeads();
-      } else {
-        setErrorMsg("Acceso denegado. No tienes rol de administrador.");
-        await signOut(auth);
-      }
-    } catch (err) { setErrorMsg("Credenciales incorrectas."); } finally { setLoading(false); }
-  };
-
-  const fetchLeads = async () => {
-    if (!db) return;
-    const leadsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'leads'));
-    setLeads(leadsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-
-  const convertToClient = async (lead) => {
-    if (!secondaryAuth) return;
-    setLoading(true);
-    try {
-      const tempPass = "Lex" + Math.floor(1000 + Math.random() * 9000);
-      const userCred = await createUserWithEmailAndPassword(secondaryAuth, lead.email, tempPass);
-      const newUid = userCred.user.uid;
-      await signOut(secondaryAuth);
-
-      // Crear Usuarios (oficial)
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUid), { uid: newUid, email: lead.email, rol: 'cliente' });
-      // Crear Clientes (operativo)
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUid), { 
-        idCliente: newUid, 
-        nombre: lead.name, 
-        email: lead.email, 
-        telefono: lead.phone, 
-        fechaRegistro: new Date().toISOString(),
-        expediente: "#"+Math.floor(1000+Math.random()*9000),
-        estadoActual: "Estudio Inicial"
-      });
-      // Marcar Lead
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', lead.id), { estado: 'convertido' });
-      
-      alert(`Cliente creado. Contraseña: ${tempPass}`);
-      fetchLeads();
-    } catch (err) { alert(err.message); } finally { setLoading(false); }
-  };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-slate-900 border border-white/10 p-8 rounded-3xl animate-fade-in-up">
-           <h2 className="text-2xl font-bold text-white text-center mb-6">Acceso Admin</h2>
-           {errorMsg && <div className="mb-4 text-red-400 text-xs text-center bg-red-400/10 p-2 rounded-lg">{errorMsg}</div>}
-           <form onSubmit={handleAdminLogin} className="space-y-4">
-              <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none focus:border-cyan-400" placeholder="Admin Email" required />
-              <input type="password" value={passcode} onChange={e => setPasscode(e.target.value)} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none focus:border-cyan-400" placeholder="Contraseña Maestra" required />
-              <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">{loading ? <Loader2 className="animate-spin mx-auto"/> : 'Entrar'}</button>
-           </form>
-           <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm hover:text-white transition-colors">Volver a Landing</button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-white p-10 animate-fade-in">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-10 pb-6 border-b border-white/10">
-          <h1 className="text-3xl font-bold flex items-center gap-3"><Database className="text-cyan-400" /> Admin Dashboard</h1>
-          <button onClick={()=>{setIsAuthenticated(false); signOut(auth);}} className="text-red-400 flex items-center gap-2"><LogOut size={18}/> Salir</button>
-        </div>
-
-        {/* Métrica Cards Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-           <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl">
-              <p className="text-slate-400 text-xs font-bold uppercase mb-2">Total Prospectos</p>
-              <p className="text-4xl font-bold text-white">{leads.length}</p>
-           </div>
-           <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl">
-              <p className="text-slate-400 text-xs font-bold uppercase mb-2">Convertidos</p>
-              <p className="text-4xl font-bold text-cyan-400">{leads.filter(l => l.estado === 'convertido').length}</p>
-           </div>
-           <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl">
-              <p className="text-slate-400 text-xs font-bold uppercase mb-2">Tasa de Cierre</p>
-              <p className="text-4xl font-bold text-emerald-400">{leads.length ? Math.round((leads.filter(l => l.estado === 'convertido').length / leads.length) * 100) : 0}%</p>
-           </div>
-        </div>
-
-        <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden">
-          <div className="p-6 border-b border-white/10 bg-slate-950/50 flex justify-between items-center">
-             <h2 className="text-lg font-bold">Gestión de Leads</h2>
-          </div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Nombre</th><th className="p-4">Email</th><th className="p-4">Estado</th><th className="p-4 text-right">Acción</th></tr></thead>
-            <tbody className="divide-y divide-white/5">
-              {leads.map(l => (
-                <tr key={l.id} className="hover:bg-white/5 transition-colors">
-                  <td className="p-4 font-bold">{l.name}</td>
-                  <td className="p-4 text-slate-400">{l.email}</td>
-                  <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${l.estado === 'convertido' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>{l.estado}</span></td>
-                  <td className="p-4 text-right">
-                    {l.estado !== 'convertido' && (
-                      <button onClick={() => convertToClient(l)} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">Convertir a Cliente</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -694,7 +628,6 @@ const AdminDashboard = ({ onExit }) => {
 export default function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
-  const [legalModal, setLegalModal] = useState({ isOpen: false, type: 'privacidad' });
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -707,7 +640,7 @@ export default function App() {
   if (currentView === 'admin') return <AdminDashboard onExit={() => setCurrentView('landing')} />;
 
   return (
-    <div id="main-scroll-container" className="h-screen overflow-y-auto bg-slate-950 text-slate-50 relative scroll-smooth font-sans">
+    <div id="main-scroll-container" className="h-screen overflow-y-auto bg-slate-950 text-slate-50 relative scroll-smooth">
       <NavBar onOpenModal={() => setIsRegistrationOpen(true)} />
       <Hero onOpenModal={() => setIsRegistrationOpen(true)} />
       <ExplainerCards />
@@ -716,20 +649,9 @@ export default function App() {
       <ComparisonModule />
       <KeyInsights />
       <SuccessStories />
-      <ScrollStory />
-      <CTASection onOpenModal={() => setIsRegistrationOpen(true)} />
-      
-      <Footer onOpenLegal={(type) => setLegalModal({ isOpen: true, type })} onOpenAdmin={() => setCurrentView('admin')} />
-      
+      <Footer onOpenAdmin={() => setCurrentView('admin')} />
       <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} />
-      <LegalModal isOpen={legalModal.isOpen} type={legalModal.type} onClose={() => setLegalModal({ ...legalModal, isOpen: false })} />
-      
-      <button onClick={() => {
-        const container = document.getElementById('main-scroll-container');
-        if (container) container.scrollTo({top:0, behavior:'smooth'});
-      }} className="fixed bottom-8 right-8 p-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 rounded-full shadow-lg z-50 hover:scale-110 transition-transform">
-        <ArrowUp />
-      </button>
+      <button onClick={() => document.getElementById('main-scroll-container').scrollTo({top:0, behavior:'smooth'})} className="fixed bottom-8 right-8 p-4 bg-cyan-500 text-slate-950 rounded-full shadow-lg z-50"><ArrowUp /></button>
     </div>
   );
 }
