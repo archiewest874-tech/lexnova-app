@@ -50,7 +50,7 @@ import {
   Target,
   LayoutDashboard
 } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithCustomToken, 
@@ -71,9 +71,35 @@ import {
   setDoc 
 } from 'firebase/firestore';
 
-// --- FIREBASE SETUP ---
+// --- FIREBASE CONFIGURATION HELPERS ---
+const getFirebaseKey = () => {
+  // 1. Intenta leer de la variable inyectada por el entorno de ejecución
+  try {
+    if (typeof __firebase_config !== 'undefined') {
+      const cfg = JSON.parse(__firebase_config);
+      if (cfg && cfg.apiKey) return cfg.apiKey;
+    }
+  } catch (e) {}
+  
+  // 2. Intenta leer de variables de entorno estándar (Vite/Vercel)
+  try {
+    if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
+      return import.meta.env.VITE_FIREBASE_API_KEY;
+    }
+  } catch (e) {}
+
+  // 3. Intenta leer de variables de entorno de Node/CRA
+  try {
+    if (process.env && process.env.REACT_APP_FIREBASE_API_KEY) {
+      return process.env.REACT_APP_FIREBASE_API_KEY;
+    }
+  } catch (e) {}
+
+  return ""; // Retorna vacío si no hay nada (evitamos null/undefined)
+};
+
 const myFirebaseConfig = {
-  apiKey: "", // Se proveerá en ejecución
+  apiKey: getFirebaseKey(),
   authDomain: "lexnova-production.firebaseapp.com",
   projectId: "lexnova-production",
   storageBucket: "lexnova-production.firebasestorage.app",
@@ -81,17 +107,24 @@ const myFirebaseConfig = {
   appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
 };
 
-const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-const finalConfig = envConfig && Object.keys(envConfig).length > 0 ? envConfig : myFirebaseConfig;
-
-const app = initializeApp(finalConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// --- INITIALIZATION SAFE GUARD ---
+let app, auth, db, secondaryApp, secondaryAuth;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
 
-// Instancia secundaria para poder crear clientes sin desloguear al Administrador
-const secondaryApp = initializeApp(finalConfig, "SecondaryAuth");
-const secondaryAuth = getAuth(secondaryApp);
+try {
+  // Solo inicializamos si tenemos al menos una API Key, de lo contrario evitamos el crash inicial
+  if (myFirebaseConfig.apiKey) {
+    app = getApps().length > 0 ? getApp() : initializeApp(myFirebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    
+    // Instancia secundaria para creación de usuarios
+    secondaryApp = getApps().find(a => a.name === "SecondaryAuth") || initializeApp(myFirebaseConfig, "SecondaryAuth");
+    secondaryAuth = getAuth(secondaryApp);
+  }
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+}
 
 // --- Funciones Globales de Formato ---
 const formatCOP = (val) => {
@@ -336,6 +369,7 @@ const ClientPortalModule = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!auth) { setError("Servicio no disponible."); return; }
     setLoading(true); setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -369,6 +403,7 @@ const ClientPortalModule = () => {
           <div className="max-w-md mx-auto bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
              <form onSubmit={handleLogin} className="space-y-4">
               {error && <p className="text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg">{error}</p>}
+              {!auth && <p className="text-yellow-400 text-xs text-center border border-yellow-400/20 py-2 rounded-lg">Falta configurar API Key de Firebase.</p>}
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase mb-2">Email</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-cyan-400 outline-none" required />
@@ -377,7 +412,7 @@ const ClientPortalModule = () => {
                 <label className="block text-xs font-medium text-slate-400 uppercase mb-2">Contraseña</label>
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-cyan-400 outline-none" required />
               </div>
-              <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-xl transition-all">
+              <button type="submit" disabled={loading || !auth} className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50">
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Ingresar al Portal'}
               </button>
             </form>
@@ -543,6 +578,7 @@ const RegistrationModal = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!db) { alert("Base de datos no disponible."); return; }
     setLoading(true);
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leads'), {
@@ -561,15 +597,16 @@ const RegistrationModal = ({ isOpen, onClose }) => {
         {!success ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <h3 className="text-2xl font-bold text-white mb-4">Solicitar Atención</h3>
-            <input required placeholder="Nombre" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-            <input required type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-            <input required placeholder="Teléfono" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-            <select required className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.interest} onChange={e => setFormData({...formData, interest: e.target.value})}>
+            {!db && <p className="text-yellow-400 text-xs text-center border border-yellow-400/20 py-2 rounded-lg">Falta configurar Firebase.</p>}
+            <input required placeholder="Nombre" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+            <input required type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            <input required placeholder="Teléfono" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+            <select required className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.interest} onChange={e => setFormData({...formData, interest: e.target.value})}>
               <option value="">Interés...</option>
               <option value="ia-legal">IA Legal</option>
               <option value="vigilancia">Vigilancia</option>
             </select>
-            <button type="submit" disabled={loading} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl">{loading ? 'Enviando...' : 'Enviar'}</button>
+            <button type="submit" disabled={loading || !db} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl disabled:opacity-50">{loading ? 'Enviando...' : 'Enviar'}</button>
           </form>
         ) : <div className="text-center py-10 text-emerald-400 font-bold">¡Solicitud Enviada!</div>}
       </div>
@@ -587,6 +624,7 @@ const AdminDashboard = ({ onExit }) => {
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
+    if (!auth) { setError("Firebase no configurado."); return; }
     setLoading(true); setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -599,11 +637,13 @@ const AdminDashboard = ({ onExit }) => {
   };
 
   const fetchLeads = async () => {
+    if (!db) return;
     const leadsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'leads'));
     setLeads(leadsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   const convertToClient = async (lead) => {
+    if (!secondaryAuth) return;
     setLoading(true);
     try {
       const tempPass = "Lex" + Math.floor(1000 + Math.random() * 9000);
@@ -626,12 +666,12 @@ const AdminDashboard = ({ onExit }) => {
         <div className="max-w-sm w-full bg-slate-900 border border-white/10 p-8 rounded-3xl">
           <h2 className="text-2xl font-bold text-white text-center mb-6">Admin Login</h2>
           <form onSubmit={handleAdminLogin} className="space-y-4">
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-            <input type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={email} onChange={e=>setEmail(e.target.value)} required />
-            <input type="password" placeholder="Password" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={password} onChange={e=>setPassword(e.target.value)} required />
+            {error && <p className="text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg">{error}</p>}
+            <input type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={email} onChange={e=>setEmail(e.target.value)} required />
+            <input type="password" placeholder="Password" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={password} onChange={e=>setPassword(e.target.value)} required />
             <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">{loading ? 'Entrando...' : 'Entrar'}</button>
           </form>
-          <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm">Regresar</button>
+          <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm hover:text-white transition-colors">Regresar</button>
         </div>
       </div>
     );
@@ -648,9 +688,9 @@ const AdminDashboard = ({ onExit }) => {
           <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Nombre</th><th className="p-4">Email</th><th className="p-4 text-right">Acción</th></tr></thead>
           <tbody className="divide-y divide-white/5">
             {leads.map(l => (
-              <tr key={l.id} className="hover:bg-white/5">
+              <tr key={l.id} className="hover:bg-white/5 transition-colors">
                 <td className="p-4">{l.name}</td><td className="p-4">{l.email}</td>
-                <td className="p-4 text-right">{l.estado !== 'convertido' && <button onClick={()=>convertToClient(l)} className="bg-indigo-600 px-3 py-1 rounded-lg text-xs">Convertir</button>}</td>
+                <td className="p-4 text-right">{l.estado !== 'convertido' && <button onClick={()=>convertToClient(l)} className="bg-indigo-600 px-3 py-1 rounded-lg text-xs hover:bg-indigo-500 transition-colors">Convertir</button>}</td>
               </tr>
             ))}
           </tbody>
@@ -667,8 +707,10 @@ export default function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
+    if (auth) {
+      const unsubscribe = onAuthStateChanged(auth, setUser);
+      return () => unsubscribe();
+    }
   }, []);
 
   if (currentView === 'admin') return <AdminDashboard onExit={() => setCurrentView('landing')} />;
@@ -691,7 +733,10 @@ export default function App() {
       <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} />
       <LegalModal isOpen={legalModal.isOpen} type={legalModal.type} onClose={() => setLegalModal({ ...legalModal, isOpen: false })} />
       
-      <button onClick={() => document.getElementById('main-scroll-container').scrollTo({top:0, behavior:'smooth'})} className="fixed bottom-8 right-8 p-4 bg-cyan-500 text-slate-950 rounded-full shadow-lg z-50">
+      <button onClick={() => {
+        const container = document.getElementById('main-scroll-container');
+        if (container) container.scrollTo({top:0, behavior:'smooth'});
+      }} className="fixed bottom-8 right-8 p-4 bg-cyan-500 text-slate-950 rounded-full shadow-lg z-50 hover:bg-cyan-400 transition-colors">
         <ArrowUp />
       </button>
     </div>
