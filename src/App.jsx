@@ -53,12 +53,11 @@ import {
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInWithCustomToken, 
-  signInAnonymously, 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signOut 
+  signOut,
+  signInWithCustomToken
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -68,34 +67,23 @@ import {
   updateDoc, 
   doc, 
   getDoc, 
-  setDoc 
+  setDoc,
+  query,
+  where
 } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION HELPERS ---
 const getFirebaseKey = () => {
-  // 1. Intenta leer de la variable inyectada por el entorno de ejecución
   try {
     if (typeof __firebase_config !== 'undefined') {
       const cfg = JSON.parse(__firebase_config);
       if (cfg && cfg.apiKey) return cfg.apiKey;
     }
   } catch (e) {}
-  
-  // 2. Intenta leer de variables de entorno estándar (Vite/Vercel)
   try {
-    if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
-      return import.meta.env.VITE_FIREBASE_API_KEY;
-    }
+    if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) return import.meta.env.VITE_FIREBASE_API_KEY;
   } catch (e) {}
-
-  // 3. Intenta leer de variables de entorno de Node/CRA
-  try {
-    if (process.env && process.env.REACT_APP_FIREBASE_API_KEY) {
-      return process.env.REACT_APP_FIREBASE_API_KEY;
-    }
-  } catch (e) {}
-
-  return ""; // Retorna vacío si no hay nada (evitamos null/undefined)
+  return ""; 
 };
 
 const myFirebaseConfig = {
@@ -107,23 +95,16 @@ const myFirebaseConfig = {
   appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
 };
 
-// --- INITIALIZATION SAFE GUARD ---
+// --- INITIALIZATION ---
 let app, auth, db, secondaryApp, secondaryAuth;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
 
-try {
-  // Solo inicializamos si tenemos al menos una API Key, de lo contrario evitamos el crash inicial
-  if (myFirebaseConfig.apiKey) {
-    app = getApps().length > 0 ? getApp() : initializeApp(myFirebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    
-    // Instancia secundaria para creación de usuarios
-    secondaryApp = getApps().find(a => a.name === "SecondaryAuth") || initializeApp(myFirebaseConfig, "SecondaryAuth");
-    secondaryAuth = getAuth(secondaryApp);
-  }
-} catch (error) {
-  console.error("Firebase initialization failed:", error);
+if (myFirebaseConfig.apiKey) {
+  app = getApps().length > 0 ? getApp() : initializeApp(myFirebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  secondaryApp = getApps().find(a => a.name === "Secondary") || initializeApp(myFirebaseConfig, "Secondary");
+  secondaryAuth = getAuth(secondaryApp);
 }
 
 // --- Funciones Globales de Formato ---
@@ -150,10 +131,8 @@ const useScrollReveal = () => {
         }
       });
     }, { threshold: 0.1 });
-
     const elements = document.querySelectorAll('.reveal-on-scroll');
     elements.forEach((el) => observer.observe(el));
-
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 };
@@ -162,22 +141,19 @@ const scrollToSection = (e, targetId) => {
   e.preventDefault();
   const container = document.getElementById('main-scroll-container');
   const element = document.getElementById(targetId);
-  
   if (container && element) {
     const navHeight = 80; 
     const containerTop = container.getBoundingClientRect().top;
     const elementTop = element.getBoundingClientRect().top;
     const scrollPos = elementTop - containerTop + container.scrollTop - navHeight;
-
     container.scrollTo({ top: scrollPos, behavior: "smooth" });
   }
 };
 
-// --- Components ---
+// --- UI COMPONENTS ---
 
 const NavBar = ({ onOpenModal }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   const handleNavClick = (e, targetId) => {
     setIsMobileMenuOpen(false); 
     scrollToSection(e, targetId);
@@ -190,7 +166,6 @@ const NavBar = ({ onOpenModal }) => {
           <Scale className="text-cyan-400 w-8 h-8 group-hover:scale-110 transition-transform" />
           <span className="text-white font-bold text-xl tracking-tight">Lex<span className="text-cyan-400">Nova</span></span>
         </div>
-        
         <div className="hidden lg:flex gap-8 text-sm font-medium text-slate-300">
           <a href="#ecosistema" onClick={(e) => handleNavClick(e, 'ecosistema')} className="hover:text-cyan-400 transition-colors cursor-pointer">Ecosistema</a>
           <a href="#soluciones" onClick={(e) => handleNavClick(e, 'soluciones')} className="hover:text-cyan-400 transition-colors cursor-pointer">Soluciones</a>
@@ -198,7 +173,6 @@ const NavBar = ({ onOpenModal }) => {
           <a href="#portal-cliente" onClick={(e) => handleNavClick(e, 'portal-cliente')} className="hover:text-cyan-400 transition-colors cursor-pointer">Portal Clientes</a>
           <a href="#casos-exito" onClick={(e) => handleNavClick(e, 'casos-exito')} className="hover:text-cyan-400 transition-colors cursor-pointer">Éxito</a>
         </div>
-        
         <div className="hidden lg:flex items-center gap-4">
           <button onClick={(e) => handleNavClick(e, 'portal-cliente')} className="text-slate-300 hover:text-cyan-400 text-sm font-medium transition-colors items-center gap-2 flex">
             <User className="w-4 h-4" /> Ingresar
@@ -208,12 +182,10 @@ const NavBar = ({ onOpenModal }) => {
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
-
         <button className="lg:hidden text-slate-300 hover:text-white p-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
           {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
         </button>
       </div>
-
       {isMobileMenuOpen && (
         <div className="lg:hidden absolute top-20 left-0 w-full bg-slate-900 border-b border-white/10 shadow-2xl animate-fade-in-down origin-top">
           <div className="flex flex-col px-6 py-6 gap-5">
@@ -222,12 +194,8 @@ const NavBar = ({ onOpenModal }) => {
             <a href="#laboratorio-ia" onClick={(e) => handleNavClick(e, 'laboratorio-ia')} className="text-base font-medium text-slate-300 hover:text-cyan-400 flex items-center gap-2"><Sparkles className="w-4 h-4 text-cyan-400"/> IA Legal</a>
             <a href="#portal-cliente" onClick={(e) => handleNavClick(e, 'portal-cliente')} className="text-base font-medium text-slate-300 hover:text-cyan-400">Portal Clientes</a>
             <hr className="border-white/10 my-2" />
-            <button onClick={(e) => handleNavClick(e, 'portal-cliente')} className="flex items-center gap-3 text-base font-medium text-slate-300 hover:text-cyan-400">
-              <User className="w-5 h-5" /> Ingresar al Portal
-            </button>
-            <button onClick={() => { setIsMobileMenuOpen(false); onOpenModal(); }} className="w-full bg-white/10 hover:bg-white/20 text-white py-3.5 rounded-xl font-bold mt-2 flex justify-center items-center gap-2 transition-all">
-              Solicitar Atención <ChevronRight className="w-5 h-5" />
-            </button>
+            <button onClick={(e) => handleNavClick(e, 'portal-cliente')} className="flex items-center gap-3 text-base font-medium text-slate-300 hover:text-cyan-400"><User className="w-5 h-5" /> Ingresar al Portal</button>
+            <button onClick={() => { setIsMobileMenuOpen(false); onOpenModal(); }} className="w-full bg-white/10 hover:bg-white/20 text-white py-3.5 rounded-xl font-bold mt-2 flex justify-center items-center gap-2">Solicitar Atención <ChevronRight className="w-5 h-5" /></button>
           </div>
         </div>
       )}
@@ -250,12 +218,10 @@ const Hero = ({ onOpenModal }) => (
         Supera las barreras del Código General del Proceso. Centraliza expedientes, automatiza tiempos y potencia tu firma con Inteligencia Artificial.
       </p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <button onClick={onOpenModal} className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-full font-semibold text-lg transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)] transform hover:-translate-y-1">
+        <button onClick={onOpenModal} className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-full font-semibold text-lg transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)]">
           Iniciar Evolución Digital
         </button>
-        <button onClick={(e) => scrollToSection(e, 'casos-exito')} className="w-full sm:w-auto px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-full font-semibold text-lg transition-all flex items-center justify-center gap-2">
-          Ver Casos de Éxito
-        </button>
+        <button onClick={(e) => scrollToSection(e, 'casos-exito')} className="w-full sm:w-auto px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-full font-semibold text-lg transition-all flex items-center justify-center gap-2">Ver Casos de Éxito</button>
       </div>
     </div>
   </section>
@@ -278,7 +244,7 @@ const ExplainerCards = () => {
         <div className="grid md:grid-cols-3 gap-6">
           {cards.map((card, idx) => (
             <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-500 group reveal-on-scroll opacity-0 translate-y-10" style={{ transitionDelay: `${idx * 150}ms` }}>
-              <div className="w-16 h-16 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+              <div className="w-16 h-16 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 {card.icon}
               </div>
               <h3 className="text-xl font-bold text-white mb-3">{card.title}</h3>
@@ -317,37 +283,21 @@ const AILabModule = () => {
     <section id="laboratorio-ia" className="py-24 bg-slate-900 border-y border-white/5 relative overflow-hidden">
       <div className="max-w-5xl mx-auto px-6 relative z-10">
         <div className="text-center mb-12 reveal-on-scroll opacity-0 translate-y-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-400 text-sm font-bold mb-6">
-            <Sparkles className="w-4 h-4" /> <span>IA Legal Lab</span>
-          </div>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-400 text-sm font-bold mb-6"><Sparkles className="w-4 h-4" /> <span>IA Legal Lab</span></div>
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">Laboratorio de IA Legal</h2>
         </div>
         <div className="grid md:grid-cols-2 gap-8 reveal-on-scroll opacity-0 translate-y-10">
           <div className="bg-slate-950 border border-white/10 rounded-2xl p-6 flex flex-col">
             <h3 className="text-white font-semibold mb-6 flex items-center gap-2"><FileText className="w-5 h-5 text-slate-400" /> Hechos del Expediente</h3>
             <textarea className="w-full bg-slate-900 border border-white/5 rounded-xl p-4 text-slate-300 h-48 mb-6 outline-none focus:ring-2 focus:ring-cyan-500/50" placeholder="Describe los hechos jurídicos..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
-            <button onClick={analyzeCase} disabled={loading} className="w-full py-4 bg-white text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Analizar con IA
-            </button>
+            <button onClick={analyzeCase} disabled={loading} className="w-full py-4 bg-white text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all">{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Analizar con IA</button>
           </div>
           <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 rounded-2xl p-6 flex flex-col min-h-[400px]">
-            {!result && !error && !loading && (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-500 opacity-60">
-                <Cpu className="w-16 h-16 mb-4" /> <p>El análisis aparecerá aquí.</p>
-              </div>
-            )}
+            {!result && !error && !loading && <div className="flex-1 flex flex-col items-center justify-center text-slate-500 opacity-60"><Cpu className="w-16 h-16 mb-4" /> <p>El análisis aparecerá aquí.</p></div>}
             {result && (
               <div className="animate-fade-in space-y-6">
-                <div>
-                  <h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Resumen Ejecutivo</h4>
-                  <p className="text-slate-300 text-sm leading-relaxed">{result.resumen_ejecutivo}</p>
-                </div>
-                <div>
-                  <h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Puntos Clave</h4>
-                  <ul className="space-y-1">
-                    {result.puntos_clave?.map((p, i) => <li key={i} className="text-sm text-slate-400 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-cyan-400"/> {p}</li>)}
-                  </ul>
-                </div>
+                <div><h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Resumen Ejecutivo</h4><p className="text-slate-300 text-sm leading-relaxed">{result.resumen_ejecutivo}</p></div>
+                <div><h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Nivel de Riesgo</h4><p className="text-lg font-bold text-white">{result.nivel_riesgo}</p></div>
               </div>
             )}
             {error && <p className="text-red-400 text-sm bg-red-400/10 p-4 rounded-xl">{error}</p>}
@@ -362,14 +312,14 @@ const ClientPortalModule = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('cliente@lexnova.com');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('cliente@ejemplo.com');
+  const [password, setPassword] = useState('123456');
   const [clientData, setClientData] = useState(null);
   const [error, setError] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!auth) { setError("Servicio no disponible."); return; }
+    if (!auth) { setError("Firebase no configurado."); return; }
     setLoading(true); setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -384,72 +334,68 @@ const ClientPortalModule = () => {
         if (clientSnap.exists()) {
           setClientData({ id: clientSnap.id, ...clientSnap.data() });
           setIsLoggedIn(true);
-        } else { setError("Perfil de cliente no encontrado."); await signOut(auth); }
-      } else { setError("Portal exclusivo para clientes."); await signOut(auth); }
+        } else { setError("Perfil de cliente no encontrado en 'clientes'."); await signOut(auth); }
+      } else { setError("Acceso restringido. Portal exclusivo para clientes."); await signOut(auth); }
     } catch (err) { setError("Credenciales inválidas."); } finally { setLoading(false); }
   };
 
   return (
-    <section id="portal-cliente" className="py-24 bg-slate-950">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="portal-cliente" className="py-24 bg-slate-950 relative overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-400 text-sm font-bold mb-6">
-            <Lock className="w-4 h-4" /> <span>Portal Transparente</span>
-          </div>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-400 text-sm font-bold mb-6"><Lock className="w-4 h-4" /> <span>Transparencia y Seguridad (Ley 527/99)</span></div>
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Portal de Acceso a Clientes</h2>
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto">Tus clientes interactúan con sus expedientes y estado de facturación en tiempo real.</p>
         </div>
 
         {!isLoggedIn ? (
           <div className="max-w-md mx-auto bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
-             <form onSubmit={handleLogin} className="space-y-4">
-              {error && <p className="text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg">{error}</p>}
-              {!auth && <p className="text-yellow-400 text-xs text-center border border-yellow-400/20 py-2 rounded-lg">Falta configurar API Key de Firebase.</p>}
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase mb-2">Email</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-cyan-400 outline-none" required />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase mb-2">Contraseña</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-cyan-400 outline-none" required />
-              </div>
-              <button type="submit" disabled={loading || !auth} className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Ingresar al Portal'}
-              </button>
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-2xl mx-auto flex items-center justify-center mb-4"><User className="w-8 h-8 text-white" /></div>
+              <h3 className="text-2xl font-bold text-white">Acceso Seguro</h3>
+            </div>
+            {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center">{error}</div>}
+            <form onSubmit={handleLogin} className="space-y-4">
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white outline-none focus:border-cyan-400" placeholder="Email" required />
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 px-4 text-white outline-none focus:border-cyan-400" placeholder="Contraseña" required />
+              <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 font-bold rounded-xl">{loading ? <Loader2 className="animate-spin mx-auto"/> : 'Ingresar al Portal'}</button>
             </form>
           </div>
         ) : (
-          <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
-             <div className="w-full md:w-64 bg-slate-950/50 p-6 border-r border-white/5 flex flex-col">
-                <div className="flex items-center gap-3 mb-10">
-                  <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50">
-                    <User className="w-5 h-5 text-cyan-400" />
-                  </div>
-                  <p className="text-sm font-bold text-white truncate">{clientData?.nombres}</p>
+          <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[600px] shadow-2xl">
+            {/* Sidebar del Cliente */}
+            <div className="w-full md:w-64 bg-slate-950/50 border-r border-white/5 p-6 flex flex-col">
+              <div className="flex items-center gap-3 mb-10">
+                <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50"><User className="w-5 h-5 text-cyan-400" /></div>
+                <div className="overflow-hidden">
+                  <p className="text-sm font-bold text-white truncate">{clientData?.nombre || 'Cliente'}</p>
+                  <p className="text-[10px] text-slate-500">Expediente {clientData?.expediente}</p>
                 </div>
-                <nav className="space-y-2 flex-1">
-                  {['resumen', 'documentos', 'facturacion'].map(t => (
-                    <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === t ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-white'}`}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
-                  ))}
-                </nav>
-                <button onClick={() => { setIsLoggedIn(false); signOut(auth); }} className="mt-8 text-red-400 hover:bg-red-400/10 p-3 rounded-xl text-sm flex items-center gap-2"><LogOut className="w-4 h-4"/> Salir</button>
-             </div>
-             <div className="flex-1 p-10">
+              </div>
+              <nav className="space-y-2 flex-1">
+                {['resumen', 'documentos', 'facturacion'].map(t => (
+                  <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === t ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-white'}`}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
+              </nav>
+              <button onClick={() => { setIsLoggedIn(false); signOut(auth); }} className="mt-8 text-red-400 hover:bg-red-400/10 p-3 rounded-xl text-sm flex items-center gap-2"><LogOut className="w-4 h-4"/> Salir</button>
+            </div>
+            {/* Contenido del Cliente */}
+            <div className="flex-1 p-10 bg-slate-900/50">
                <h3 className="text-2xl font-bold text-white mb-8 capitalize">{activeTab}</h3>
                {activeTab === 'resumen' && (
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                      <p className="text-xs text-slate-500 uppercase mb-1">Nombre</p>
-                      <p className="text-lg font-bold text-white">{clientData?.nombres}</p>
-                    </div>
-                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                      <p className="text-xs text-slate-500 uppercase mb-1">Cédula / NIT</p>
-                      <p className="text-lg font-bold text-white">{clientData?.cedula_nit}</p>
+                 <div className="space-y-6 animate-fade-in">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5"><p className="text-xs text-slate-500 font-bold mb-1">Estado</p><p className="text-emerald-400 font-bold">{clientData?.estadoActual}</p></div>
+                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5"><p className="text-xs text-slate-500 font-bold mb-1">Audiencia</p><p className="text-white font-bold">{clientData?.proximaAudiencia}</p></div>
+                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5"><p className="text-xs text-slate-500 font-bold mb-1">Juzgado</p><p className="text-white font-bold">{clientData?.juzgado}</p></div>
                     </div>
                  </div>
                )}
-             </div>
+               {activeTab === 'documentos' && <div className="text-slate-500 italic">Módulo de documentos en línea...</div>}
+               {activeTab === 'facturacion' && <div className="text-slate-500 italic">Módulo de pagos y honorarios...</div>}
+            </div>
           </div>
         )}
       </div>
@@ -537,9 +483,7 @@ const CTASection = ({ onOpenModal }) => (
   <section className="py-24 text-center relative overflow-hidden">
     <div className="absolute inset-0 bg-blue-600/5" />
     <h2 className="text-4xl md:text-6xl font-extrabold text-white mb-6">Lidera la Práctica Jurídica.</h2>
-    <button onClick={onOpenModal} className="px-10 py-5 bg-white text-slate-950 rounded-full font-bold shadow-lg flex items-center gap-3 mx-auto group">
-      Solicitar Demo <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-    </button>
+    <button onClick={onOpenModal} className="px-10 py-5 bg-white text-slate-950 rounded-full font-bold shadow-lg flex items-center gap-3 mx-auto group">Solicitar Demo <ArrowRight className="group-hover:translate-x-1 transition-transform" /></button>
   </section>
 );
 
@@ -551,7 +495,7 @@ const Footer = ({ onOpenLegal, onOpenAdmin }) => (
       <div className="flex gap-6 text-sm text-slate-500">
         <button onClick={() => onOpenLegal('privacidad')}>Privacidad</button>
         <button onClick={() => onOpenLegal('terminos')}>Términos</button>
-        <button onClick={onOpenAdmin} className="text-cyan-400 flex items-center gap-1"><ShieldCheck size={14}/> Admin</button>
+        <button onClick={onOpenAdmin} className="text-cyan-400 flex items-center gap-1 font-bold"><ShieldCheck size={14}/> Portal Admin</button>
       </div>
     </div>
   </footer>
@@ -593,11 +537,10 @@ const RegistrationModal = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl animate-fade-in-up">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
         {!success ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <h3 className="text-2xl font-bold text-white mb-4">Solicitar Atención</h3>
-            {!db && <p className="text-yellow-400 text-xs text-center border border-yellow-400/20 py-2 rounded-lg">Falta configurar Firebase.</p>}
             <input required placeholder="Nombre" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
             <input required type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             <input required placeholder="Teléfono" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
@@ -606,7 +549,7 @@ const RegistrationModal = ({ isOpen, onClose }) => {
               <option value="ia-legal">IA Legal</option>
               <option value="vigilancia">Vigilancia</option>
             </select>
-            <button type="submit" disabled={loading || !db} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl disabled:opacity-50">{loading ? 'Enviando...' : 'Enviar'}</button>
+            <button type="submit" disabled={loading} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl">{loading ? 'Enviando...' : 'Enviar Solicitud'}</button>
           </form>
         ) : <div className="text-center py-10 text-emerald-400 font-bold">¡Solicitud Enviada!</div>}
       </div>
@@ -614,26 +557,35 @@ const RegistrationModal = ({ isOpen, onClose }) => {
   );
 };
 
+// --- MÓDULO DASHBOARD ADMIN MEJORADO ---
 const AdminDashboard = ({ onExit }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [adminEmail, setAdminEmail] = useState('admin@lexnova.com');
+  const [passcode, setPasscode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [leads, setLeads] = useState([]);
+  const [viewMode, setViewMode] = useState('leads'); // 'leads' o 'clients'
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
-    if (!auth) { setError("Firebase no configurado."); return; }
-    setLoading(true); setError('');
+    if (!auth) { setErrorMsg("Firebase no disponible."); return; }
+    setLoading(true); setErrorMsg('');
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, adminEmail, passcode);
       const user = userCredential.user;
+      
       const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid);
       const userSnap = await getDoc(userRef);
-      if (userSnap.exists() && userSnap.data().rol === 'admin') { setIsAuthenticated(true); fetchLeads(); }
-      else { setError("No tienes permisos de administrador."); await signOut(auth); }
-    } catch (err) { setError("Credenciales incorrectas."); } finally { setLoading(false); }
+      
+      if (userSnap.exists() && userSnap.data().rol === 'admin') {
+        setIsAuthenticated(true);
+        fetchLeads();
+      } else {
+        setErrorMsg("Acceso denegado. No tienes rol de administrador.");
+        await signOut(auth);
+      }
+    } catch (err) { setErrorMsg("Credenciales incorrectas."); } finally { setLoading(false); }
   };
 
   const fetchLeads = async () => {
@@ -651,8 +603,19 @@ const AdminDashboard = ({ onExit }) => {
       const newUid = userCred.user.uid;
       await signOut(secondaryAuth);
 
+      // Crear Usuarios (oficial)
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUid), { uid: newUid, email: lead.email, rol: 'cliente' });
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUid), { idCliente: newUid, nombres: lead.name, email: lead.email, telefono: lead.phone, fechaRegistro: new Date().toISOString() });
+      // Crear Clientes (operativo)
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUid), { 
+        idCliente: newUid, 
+        nombre: lead.name, 
+        email: lead.email, 
+        telefono: lead.phone, 
+        fechaRegistro: new Date().toISOString(),
+        expediente: "#"+Math.floor(1000+Math.random()*9000),
+        estadoActual: "Estudio Inicial"
+      });
+      // Marcar Lead
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', lead.id), { estado: 'convertido' });
       
       alert(`Cliente creado. Contraseña: ${tempPass}`);
@@ -663,38 +626,66 @@ const AdminDashboard = ({ onExit }) => {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-slate-900 border border-white/10 p-8 rounded-3xl">
-          <h2 className="text-2xl font-bold text-white text-center mb-6">Admin Login</h2>
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            {error && <p className="text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg">{error}</p>}
-            <input type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={email} onChange={e=>setEmail(e.target.value)} required />
-            <input type="password" placeholder="Password" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={password} onChange={e=>setPassword(e.target.value)} required />
-            <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">{loading ? 'Entrando...' : 'Entrar'}</button>
-          </form>
-          <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm hover:text-white transition-colors">Regresar</button>
+        <div className="max-w-sm w-full bg-slate-900 border border-white/10 p-8 rounded-3xl animate-fade-in-up">
+           <h2 className="text-2xl font-bold text-white text-center mb-6">Acceso Admin</h2>
+           {errorMsg && <div className="mb-4 text-red-400 text-xs text-center bg-red-400/10 p-2 rounded-lg">{errorMsg}</div>}
+           <form onSubmit={handleAdminLogin} className="space-y-4">
+              <input type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none focus:border-cyan-400" placeholder="Admin Email" required />
+              <input type="password" value={passcode} onChange={e => setPasscode(e.target.value)} className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none focus:border-cyan-400" placeholder="Contraseña Maestra" required />
+              <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">{loading ? <Loader2 className="animate-spin mx-auto"/> : 'Entrar'}</button>
+           </form>
+           <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm hover:text-white transition-colors">Volver a Landing</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-10">
-      <div className="max-w-6xl mx-auto flex justify-between mb-10">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <button onClick={()=>{setIsAuthenticated(false); signOut(auth);}} className="text-red-400 flex items-center gap-2"><LogOut size={18}/> Salir</button>
-      </div>
-      <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Nombre</th><th className="p-4">Email</th><th className="p-4 text-right">Acción</th></tr></thead>
-          <tbody className="divide-y divide-white/5">
-            {leads.map(l => (
-              <tr key={l.id} className="hover:bg-white/5 transition-colors">
-                <td className="p-4">{l.name}</td><td className="p-4">{l.email}</td>
-                <td className="p-4 text-right">{l.estado !== 'convertido' && <button onClick={()=>convertToClient(l)} className="bg-indigo-600 px-3 py-1 rounded-lg text-xs hover:bg-indigo-500 transition-colors">Convertir</button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="min-h-screen bg-slate-950 text-white p-10 animate-fade-in">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-10 pb-6 border-b border-white/10">
+          <h1 className="text-3xl font-bold flex items-center gap-3"><Database className="text-cyan-400" /> Admin Dashboard</h1>
+          <button onClick={()=>{setIsAuthenticated(false); signOut(auth);}} className="text-red-400 flex items-center gap-2"><LogOut size={18}/> Salir</button>
+        </div>
+
+        {/* Métrica Cards Rápidas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+           <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl">
+              <p className="text-slate-400 text-xs font-bold uppercase mb-2">Total Prospectos</p>
+              <p className="text-4xl font-bold text-white">{leads.length}</p>
+           </div>
+           <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl">
+              <p className="text-slate-400 text-xs font-bold uppercase mb-2">Convertidos</p>
+              <p className="text-4xl font-bold text-cyan-400">{leads.filter(l => l.estado === 'convertido').length}</p>
+           </div>
+           <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl">
+              <p className="text-slate-400 text-xs font-bold uppercase mb-2">Tasa de Cierre</p>
+              <p className="text-4xl font-bold text-emerald-400">{leads.length ? Math.round((leads.filter(l => l.estado === 'convertido').length / leads.length) * 100) : 0}%</p>
+           </div>
+        </div>
+
+        <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden">
+          <div className="p-6 border-b border-white/10 bg-slate-950/50 flex justify-between items-center">
+             <h2 className="text-lg font-bold">Gestión de Leads</h2>
+          </div>
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Nombre</th><th className="p-4">Email</th><th className="p-4">Estado</th><th className="p-4 text-right">Acción</th></tr></thead>
+            <tbody className="divide-y divide-white/5">
+              {leads.map(l => (
+                <tr key={l.id} className="hover:bg-white/5 transition-colors">
+                  <td className="p-4 font-bold">{l.name}</td>
+                  <td className="p-4 text-slate-400">{l.email}</td>
+                  <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${l.estado === 'convertido' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>{l.estado}</span></td>
+                  <td className="p-4 text-right">
+                    {l.estado !== 'convertido' && (
+                      <button onClick={() => convertToClient(l)} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20">Convertir a Cliente</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -716,7 +707,7 @@ export default function App() {
   if (currentView === 'admin') return <AdminDashboard onExit={() => setCurrentView('landing')} />;
 
   return (
-    <div id="main-scroll-container" className="h-screen overflow-y-auto bg-slate-950 text-slate-50 relative scroll-smooth">
+    <div id="main-scroll-container" className="h-screen overflow-y-auto bg-slate-950 text-slate-50 relative scroll-smooth font-sans">
       <NavBar onOpenModal={() => setIsRegistrationOpen(true)} />
       <Hero onOpenModal={() => setIsRegistrationOpen(true)} />
       <ExplainerCards />
@@ -736,7 +727,7 @@ export default function App() {
       <button onClick={() => {
         const container = document.getElementById('main-scroll-container');
         if (container) container.scrollTo({top:0, behavior:'smooth'});
-      }} className="fixed bottom-8 right-8 p-4 bg-cyan-500 text-slate-950 rounded-full shadow-lg z-50 hover:bg-cyan-400 transition-colors">
+      }} className="fixed bottom-8 right-8 p-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 rounded-full shadow-lg z-50 hover:scale-110 transition-transform">
         <ArrowUp />
       </button>
     </div>
