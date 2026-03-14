@@ -52,18 +52,9 @@ import {
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
-// =========================================================================
-// ⚠️ INSTRUCCIONES PARA CONFIGURAR LAS LLAVES SEGURAS:
-// 1. En la raíz de tu proyecto (junto a package.json), crea un archivo llamado: .env
-// 2. Abre ese archivo .env y pega exactamente estas líneas:
-// VITE_GEMINI_API_KEY="Tu_Llave_De_Gemini"
-// VITE_FIREBASE_API_KEY="Tu_Llave_De_Firebase"
-// 3. Guarda el archivo y reinicia tu servidor local (ej. npm run dev)
-// =========================================================================
-
 const getFirebaseKey = () => {
   try {
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
@@ -78,10 +69,8 @@ const getFirebaseKey = () => {
   return "TU_API_KEY_DE_FIREBASE_AQUI"; 
 };
 
-// 👇 ACTUALIZA ESTOS VALORES con los que te da la consola de Firebase
-// en la sección: Configuración (Engranaje) -> General -> Tus Aplicaciones
 const myFirebaseConfig = {
-  apiKey: getFirebaseKey(), // Mantenemos esto para seguridad
+  apiKey: getFirebaseKey(),
   authDomain: "lexnova-production.firebaseapp.com",
   projectId: "lexnova-production",
   storageBucket: "lexnova-production.firebasestorage.app",
@@ -89,8 +78,6 @@ const myFirebaseConfig = {
   appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
 };
 
-// --- AI SETUP ---
-// La API Key de Gemini ya no vive en el Frontend por seguridad.
 const myAiConfig = {};
 
 const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -101,7 +88,6 @@ const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
 
-// NUEVO: Instancia secundaria para poder crear clientes sin desloguear al Administrador
 const secondaryApp = Object.keys(finalConfig).length > 0 ? initializeApp(finalConfig, "Secondary") : null;
 const secondaryAuth = secondaryApp ? getAuth(secondaryApp) : null;
 
@@ -178,7 +164,6 @@ const NavBar = ({ onOpenModal }) => {
           <span className="text-white font-bold text-xl tracking-tight">Lex<span className="text-cyan-400">Nova</span></span>
         </div>
         
-        {/* Menú Desktop */}
         <div className="hidden lg:flex gap-8 text-sm font-medium text-slate-300">
           <a href="#ecosistema" onClick={(e) => handleNavClick(e, 'ecosistema')} className="hover:text-cyan-400 transition-colors cursor-pointer">Ecosistema</a>
           <a href="#soluciones" onClick={(e) => handleNavClick(e, 'soluciones')} className="hover:text-cyan-400 transition-colors cursor-pointer">Soluciones</a>
@@ -201,7 +186,6 @@ const NavBar = ({ onOpenModal }) => {
           </button>
         </div>
 
-        {/* Botón Hamburguesa Mobile */}
         <button 
           className="lg:hidden text-slate-300 hover:text-white p-2 transition-colors"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -210,7 +194,6 @@ const NavBar = ({ onOpenModal }) => {
         </button>
       </div>
 
-      {/* Panel Desplegable Mobile */}
       {isMobileMenuOpen && (
         <div className="lg:hidden absolute top-20 left-0 w-full bg-slate-900 border-b border-white/10 shadow-2xl animate-fade-in-down origin-top">
           <div className="flex flex-col px-6 py-6 gap-5">
@@ -339,7 +322,6 @@ const AILabModule = () => {
     setInputText(`Hechos: El día 15 de marzo de 2025, el trabajador Juan Pérez fue despedido de la empresa Industrias XYZ bajo la causal de "bajo rendimiento". Sin embargo, no se llevó a cabo ningún proceso disciplinario previo, ni se le otorgaron memorandos o descargos. El trabajador tenía fuero sindical vigente hasta diciembre de 2025. El empleado busca demandar por despido injustificado y violación al debido proceso laboral.`);
   };
 
-  // ESTA ES LA FUNCIÓN ACTUALIZADA QUE LLAMA A TU BACKEND (/api/analyze)
   const analyzeCase = async () => {
     if (!inputText.trim()) {
       setError("Por favor, ingresa los hechos del caso procesal.");
@@ -351,7 +333,6 @@ const AILabModule = () => {
     setResult(null);
 
     try {
-      // Llamada al backend propio en Vercel
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -365,13 +346,11 @@ const AILabModule = () => {
 
       const data = await response.json();
 
-      // 1. NUEVO: Verificamos si Google nos devolvió un error (ej. API Key inválida)
       if (data.error) {
         const mensajeGoogle = typeof data.error === 'string' ? data.error : data.error.message;
         throw new Error(`Rechazado por Google Gemini: ${mensajeGoogle}`);
       }
 
-      // 2. Procesamos la respuesta limpia del backend
       if (data.resumen_ejecutivo) {
         setResult(data);
       } else if (data.candidates && data.candidates.length > 0) {
@@ -385,7 +364,6 @@ const AILabModule = () => {
 
     } catch (err) {
       console.error("Error al analizar el caso:", err);
-      // Mostramos el error real en pantalla
       setError(`Error de conexión: ${err.message}`);
     } finally {
       setLoading(false);
@@ -533,11 +511,9 @@ const ClientPortalModule = () => {
     setLoginError('');
     
     try {
-      // 1. Autenticación Real con Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Buscar datos del cliente por UID (Arquitectura oficial)
       const clientRef = doc(db, 'artifacts', appId, 'public', 'data', 'clientes', user.uid);
       const clientSnap = await getDoc(clientRef);
 
@@ -545,7 +521,6 @@ const ClientPortalModule = () => {
         setClientData({ id: clientSnap.id, ...clientSnap.data() });
         setIsLoggedIn(true);
       } else {
-        // Fallback de retrocompatibilidad por si hay usuarios de la versión anterior
         const oldClientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clients');
         const snapshot = await getDocs(oldClientsRef);
         let foundUser = null;
@@ -742,7 +717,7 @@ const ClientPortalModule = () => {
                   <User className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white">{clientData?.nombre || 'Cliente'}</p>
+                  <p className="text-sm font-bold text-white">{clientData?.nombre || clientData?.nombres || 'Cliente'}</p>
                   <p className="text-xs text-slate-500">Expediente {clientData?.expediente}</p>
                 </div>
               </div>
@@ -1519,7 +1494,8 @@ const LegalModal = ({ isOpen, onClose, type }) => {
 };
 
 const RegistrationModal = ({ isOpen, onClose, user }) => {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', interest: '' });
+  // SPRINT 2: Estandarización de schema NoSQL (nombre, telefono, interes)
+  const [formData, setFormData] = useState({ nombre: '', email: '', telefono: '', interes: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -1533,6 +1509,7 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
 
     try {
       if (db && user) {
+        // SPRINT 2: Apuntando a la colección 'leads' con la estructura corregida
         const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
         await addDoc(leadsRef, {
           ...formData,
@@ -1548,7 +1525,7 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
       setIsSuccess(true);
       setTimeout(() => {
         setIsSuccess(false);
-        setFormData({ name: '', email: '', phone: '', interest: '' });
+        setFormData({ nombre: '', email: '', telefono: '', interes: '' });
         onClose();
       }, 3000); 
     } catch (error) {
@@ -1600,8 +1577,8 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
                     <input 
                       required
                       type="text" 
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                       className="w-full bg-slate-950/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all" 
                       placeholder="Dr. Carlos Mendoza" 
                     />
@@ -1631,8 +1608,8 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
                       <input 
                         required
                         type="tel" 
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        value={formData.telefono}
+                        onChange={(e) => setFormData({...formData, telefono: e.target.value})}
                         className="w-full bg-slate-950/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all" 
                         placeholder="+57 300 000 0000" 
                       />
@@ -1646,8 +1623,8 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
                     <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
                     <select 
                       required
-                      value={formData.interest}
-                      onChange={(e) => setFormData({...formData, interest: e.target.value})}
+                      value={formData.interes}
+                      onChange={(e) => setFormData({...formData, interes: e.target.value})}
                       className="w-full bg-slate-950/50 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white appearance-none focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all cursor-pointer"
                     >
                       <option value="" disabled className="bg-slate-900">Selecciona el Área de Interés...</option>
@@ -1711,7 +1688,7 @@ const AdminDashboard = ({ onExit }) => {
   // Data States
   const [viewMode, setViewMode] = useState('leads'); // 'leads' o 'clients'
   const [leads, setLeads] = useState([]);
-  const [clients, setClients] = useState([]);
+  const [clients, setClients] = useState([]); // Ahora guardará 'Expedientes' con info de Cliente combinada
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -1725,13 +1702,7 @@ const AdminDashboard = ({ onExit }) => {
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
   const [leadToConvert, setLeadToConvert] = useState(null);
   const [conversionData, setConversionData] = useState({
-    nombres: '',
-    cedula: '',
-    email: '',
-    telefono: '',
-    direccion: '',
-    tipoCaso: '',
-    fechaInicio: new Date().toISOString().split('T')[0]
+    nombres: '', cedula: '', email: '', telefono: '', direccion: '', tipoCaso: '', fechaInicio: new Date().toISOString().split('T')[0]
   });
 
   const handleLogin = async (e) => {
@@ -1741,30 +1712,20 @@ const AdminDashboard = ({ onExit }) => {
     setLoading(true);
     setErrorMsg('');
     try {
-      // Autenticación Real de Administrador
       const userCredential = await signInWithEmailAndPassword(auth, adminEmail, passcode);
       const user = userCredential.user;
-
-      // Verificar rol en colección 'usuarios'
       const userDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid));
       
       if (userDoc.exists() && userDoc.data().rol === 'admin') {
         setIsAuthenticated(true);
-        fetchData().then(() => {
-          setShowOverviewModal(true); 
-        });
+        fetchData().then(() => setShowOverviewModal(true));
       } else {
-        // Si no tiene rol pero logró autenticarse, por ser entorno de pruebas le damos rol de admin inicial
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid), {
-          email: user.email,
-          rol: 'admin'
-        }, { merge: true });
-        
+        // Fallback admin para entorno de pruebas
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid), { email: user.email, rol: 'admin' }, { merge: true });
         setIsAuthenticated(true);
         fetchData().then(() => setShowOverviewModal(true));
       }
     } catch (err) {
-      console.error(err);
       setErrorMsg('Credenciales incorrectas o error de conexión.');
     } finally {
       setLoading(false);
@@ -1778,7 +1739,7 @@ const AdminDashboard = ({ onExit }) => {
     const thisWeek = data.filter(lead => new Date(lead.fechaRegistro) > oneWeekAgo).length;
 
     const interestCounts = data.reduce((acc, lead) => {
-      acc[lead.interest] = (acc[lead.interest] || 0) + 1;
+      acc[lead.interes] = (acc[lead.interes] || 0) + 1;
       return acc;
     }, {});
     
@@ -1793,48 +1754,16 @@ const AdminDashboard = ({ onExit }) => {
     setLeadsStats({ total, thisWeek, topInterest });
   };
 
-  const calculateClientsStats = (data) => {
-    const total = data.length;
-    const activeCases = data.filter(c => c.estadoActual && !c.estadoActual.toLowerCase().includes('cerrado')).length;
-    const nextHearings = data.filter(c => c.proximaAudiencia && !c.proximaAudiencia.toLowerCase().includes('pendiente')).length;
+  const calculateClientsStats = (expedientesData) => {
+    const total = expedientesData.length;
+    const activeCases = expedientesData.filter(c => c.estadoActual && !c.estadoActual.toLowerCase().includes('cerrado')).length;
+    const nextHearings = expedientesData.filter(c => c.proximaAudiencia && !c.proximaAudiencia.toLowerCase().includes('pendiente')).length;
     
-    const totalHonorarios = data.reduce((sum, c) => sum + parseCOP(c.honorarios), 0);
-
-    const totalRecaudo = data.reduce((sum, c) => {
-      const pagos = c.pagos || [];
-      const sumaPagos = pagos.reduce((pSum, p) => pSum + parseCOP(p.monto), 0);
-      return sum + sumaPagos;
-    }, 0);
-
+    // Sprint 3: Uso de campos agregados de la Colección de Expedientes
+    const totalHonorarios = expedientesData.reduce((sum, c) => sum + (Number(c.honorariosCOP) || 0), 0);
+    const totalRecaudo = expedientesData.reduce((sum, c) => sum + (Number(c.totalRecaudoCOP) || 0), 0);
     const saldoPendiente = totalHonorarios - totalRecaudo;
-
-    // Cálculo de Pagos Próximos (15 días)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const fifteenDaysFromNow = new Date(today);
-    fifteenDaysFromNow.setDate(today.getDate() + 15);
-
-    const totalProximosPagos = data.reduce((sum, c) => {
-      const planPagos = c.planPagos || [];
-      const sumaProximos = planPagos.reduce((pSum, plan) => {
-        if (plan.fecha) {
-          let planDateObj = new Date(plan.fecha);
-          // Ajuste de zona horaria seguro para inputs type="date" (YYYY-MM-DD)
-          if (plan.fecha.includes('-')) {
-            const [y, m, d] = plan.fecha.split('-');
-            planDateObj = new Date(y, m - 1, d);
-          }
-          
-          if (!isNaN(planDateObj.getTime())) {
-            if (planDateObj >= today && planDateObj <= fifteenDaysFromNow) {
-              return pSum + parseCOP(plan.monto);
-            }
-          }
-        }
-        return pSum;
-      }, 0);
-      return sum + sumaProximos;
-    }, 0);
+    const totalProximosPagos = 0; // Se delega a Analytics en Cloud Functions
 
     setClientsStats({ total, activeCases, nextHearings, totalHonorarios, totalRecaudo, saldoPendiente, totalProximosPagos });
   };
@@ -1843,6 +1772,7 @@ const AdminDashboard = ({ onExit }) => {
     if (!db) return;
     setLoading(true);
     try {
+      // Fetch Leads
       const leadsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
       const leadsSnap = await getDocs(leadsRef);
       const leadsData = [];
@@ -1851,16 +1781,29 @@ const AdminDashboard = ({ onExit }) => {
       setLeads(leadsData);
       calculateLeadsStats(leadsData);
 
-      // Migrado para apuntar a la nueva colección oficial: 'clientes'
-      const clientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'clientes');
-      const clientsSnap = await getDocs(clientsRef);
-      const clientsData = [];
-      clientsSnap.forEach(doc => clientsData.push({ id: doc.id, ...doc.data() }));
-      setClients(clientsData);
-      calculateClientsStats(clientsData);
+      // SPRINT 3: Relación NoSQL Cliente-Expediente en Memoria
+      const clientesRef = collection(db, 'artifacts', appId, 'public', 'data', 'clientes');
+      const clientesSnap = await getDocs(clientesRef);
+      const clientesMap = {};
+      clientesSnap.forEach(doc => {
+        clientesMap[doc.id] = { id: doc.id, ...doc.data() };
+      });
 
+      const expedientesRef = collection(db, 'artifacts', appId, 'public', 'data', 'expedientes');
+      const expedientesSnap = await getDocs(expedientesRef);
+      const expedientesData = [];
+      expedientesSnap.forEach(doc => {
+        const exp = { id: doc.id, ...doc.data() };
+        // Unión de datos relacionales
+        exp.clienteInfo = exp.idCliente && clientesMap[exp.idCliente] 
+          ? clientesMap[exp.idCliente] 
+          : { nombres: 'Desconocido', cedula_nit: 'N/A', telefono: '', email: '', direccion: '' };
+        expedientesData.push(exp);
+      });
+
+      setClients(expedientesData);
+      calculateClientsStats(expedientesData);
     } catch (error) {
-      console.error("Error fetching data:", error);
       setErrorMsg("Error al conectar con la base de datos.");
     } finally {
       setLoading(false);
@@ -1870,12 +1813,12 @@ const AdminDashboard = ({ onExit }) => {
   const openConversionModal = (lead) => {
     setLeadToConvert(lead);
     setConversionData({
-      nombres: lead.name || '',
+      nombres: lead.nombre || '',
       cedula: '',
       email: lead.email || '',
-      telefono: lead.phone || '',
+      telefono: lead.telefono || '',
       direccion: '',
-      tipoCaso: lead.interest === 'ia-legal' ? 'Asesoría IA Legal' : (lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : (lead.interest === 'consulta' ? 'Consulta Jurídica' : (lead.interest === 'asesoria' ? 'Asesoría Jurídica' : 'Representación Litigiosa'))),
+      tipoCaso: lead.interes === 'ia-legal' ? 'Asesoría IA Legal' : (lead.interes === 'vigilancia' ? 'Vigilancia Judicial' : (lead.interes === 'consulta' ? 'Consulta Jurídica' : (lead.interes === 'asesoria' ? 'Asesoría Jurídica' : 'Representación Litigiosa'))),
       fechaInicio: new Date().toISOString().split('T')[0]
     });
     setIsConversionModalOpen(true);
@@ -1889,80 +1832,75 @@ const AdminDashboard = ({ onExit }) => {
     
     try {
       const generatedPassword = 'lexnova' + Math.floor(Math.random() * 10000);
-      
-      // 1. Crear el usuario en Firebase Auth sin cerrar la sesión del admin (usando secondaryAuth)
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, conversionData.email, generatedPassword);
       const newUserId = userCredential.user.uid;
-      
-      // Cierra la sesión secundaria de inmediato
       await signOut(secondaryAuth);
 
-      // 2. Crear documento de permisos en la colección 'usuarios'
-      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUserId);
-      await setDoc(userRef, {
-        uid: newUserId,
-        email: conversionData.email,
-        rol: 'cliente'
+      // 1. Colección Usuarios (Auth Rules)
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUserId), {
+        uid: newUserId, email: conversionData.email, rol: 'cliente'
       });
 
-      // 3. Crear documento operativo en la colección 'clientes' (con el mismo UID)
-      const clientsRef = doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUserId);
-      const newExpediente = `#${Math.floor(Math.random() * 9000) + 1000}-${conversionData.tipoCaso.substring(0,3).toUpperCase()}`;
-      
-      await setDoc(clientsRef, {
+      // 2. Colección Clientes (Perfil)
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUserId), {
         idCliente: newUserId,
-        email: conversionData.email,
-        passwordTemporal: generatedPassword, 
-        nombre: conversionData.nombres,
+        nombres: conversionData.nombres,
         cedula_nit: conversionData.cedula,
         telefono: conversionData.telefono,
         direccion: conversionData.direccion,
-        tipoCaso: conversionData.tipoCaso,
-        fechaRegistro: new Date().toISOString(),
-        fechaInicioContrato: conversionData.fechaInicio, 
-        honorarios: '', 
-        estadoFacturacion: 'Pendiente',
-        expediente: newExpediente,
-        estadoActual: 'Estudio Inicial',
-        proximaAudiencia: 'Pendiente de fijación',
-        juzgado: 'Por Asignar',
-        registroTiempos: [], 
-        pagos: [], 
-        planPagos: [], 
-        documentosRequeridos: [
-          { id: 'req1', nombre: 'Copia de Cédula de Ciudadanía', subido: false, fecha: '' },
-          { id: 'req2', nombre: 'Poder Firmado o Autenticado', subido: false, fecha: '' },
-          { id: 'req3', nombre: 'Documentación Probatoria Base', subido: false, fecha: '' }
-        ],
-        timeline: [
-          { title: 'Firma de Contrato', date: conversionData.fechaInicio, desc: 'Inicio formal de la relación comercial e ingreso al sistema.', done: true },
-          { title: 'Recepción de Documentos', date: 'Pendiente', desc: 'A la espera de anexos y poderes para iniciar gestión.', done: false }
-        ],
-        documentos: []
+        email: conversionData.email,
+        fechaRegistro: new Date().toISOString()
       });
 
-      // 4. Actualizar estado del Lead
-      const leadDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadToConvert.id);
-      await updateDoc(leadDocRef, { estado: 'convertido' });
+      // 3. Colección Expedientes (Proceso Legal)
+      const expedientesRef = collection(db, 'artifacts', appId, 'public', 'data', 'expedientes');
+      const newExpedienteId = `#${Math.floor(Math.random() * 9000) + 1000}-${conversionData.tipoCaso.substring(0,3).toUpperCase()}`;
+      
+      const newExpDoc = await addDoc(expedientesRef, {
+        idCliente: newUserId,
+        radicadoInterno: newExpedienteId,
+        radicadoJudicial: 'Por Asignar',
+        tipoCaso: conversionData.tipoCaso,
+        juzgado: 'Por Asignar',
+        estadoActual: 'Estudio Inicial',
+        proximaAudiencia: 'Pendiente de fijación',
+        honorariosCOP: 0,
+        totalRecaudoCOP: 0,
+        formaPago: '',
+        estadoFacturacion: 'Pendiente',
+        fechaInicioContrato: conversionData.fechaInicio,
+        passwordTemporal: generatedPassword 
+      });
 
-      setSuccessMsg(`¡Ficha creada! ${conversionData.nombres} es ahora cliente. Su contraseña temporal es: ${generatedPassword}`);
+      // 4. Crear actuación inicial en Sub-colección
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', newExpDoc.id, 'actuaciones'), {
+        title: 'Firma de Contrato',
+        date: conversionData.fechaInicio,
+        desc: 'Inicio formal de la relación comercial e ingreso al sistema.',
+        done: true
+      });
+
+      // Actualizar Lead
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', leadToConvert.id), { estado: 'convertido' });
+
+      setSuccessMsg(`¡Ficha dividida y creada! ${conversionData.nombres} es ahora cliente. Contraseña: ${generatedPassword}`);
       setIsConversionModalOpen(false);
       setLeadToConvert(null);
       setTimeout(() => setSuccessMsg(''), 10000);
       
       await fetchData();
     } catch (error) {
-      console.error("Error en conversión:", error);
       setErrorMsg("Ocurrió un error al guardar la ficha: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- GESTIÓN DE CLIENTE EXISTENTE (FICHA MAESTRA) ---
-  const [editingClient, setEditingClient] = useState(null);
+  // --- GESTIÓN DE CLIENTE EXISTENTE (SUB-COLECCIONES) ---
+  const [editingClient, setEditingClient] = useState(null); // Ahora es el objeto Expediente
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [clientModalTab, setClientModalTab] = useState('general'); // 'general', 'docs', 'erp'
+  const [clientModalTab, setClientModalTab] = useState('general');
+  const [subDocs, setSubDocs] = useState({ actuaciones: [], pagos: [], tiempos: [], documentos: [], planPagos: [], requisitos: [] });
   
   const [newDocName, setNewDocName] = useState('');
   const [newTimelineTitle, setNewTimelineTitle] = useState('');
@@ -1970,88 +1908,135 @@ const AdminDashboard = ({ onExit }) => {
   const [newPaymentEntry, setNewPaymentEntry] = useState({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
   const [newPlanEntry, setNewPlanEntry] = useState({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
 
-  const openClientDetail = (client) => {
-    setEditingClient({ 
-      ...client, 
-      honorarios: client.honorarios || '',
-      formaPago: client.formaPago || '',
-      estadoFacturacion: client.estadoFacturacion || 'Al Día',
-      registroTiempos: client.registroTiempos || [],
-      pagos: client.pagos || [],
-      planPagos: client.planPagos || []
-    });
+  const openClientDetail = async (expediente) => {
+    setEditingClient(expediente);
     setClientModalTab('general');
     setIsClientModalOpen(true);
+    setLoading(true);
+    setSubDocs({ actuaciones: [], pagos: [], tiempos: [], documentos: [], planPagos: [], requisitos: [] }); // Reset
+
+    try {
+      const expId = expediente.id;
+      // Fetch Sub-colecciones
+      const [actSnap, pagosSnap, tiemposSnap, docsSnap, planSnap, reqSnap] = await Promise.all([
+        getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'actuaciones')),
+        getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'pagos')),
+        getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'tiempos')),
+        getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'documentos')),
+        getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'planPagos')),
+        getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'requisitos'))
+      ]);
+
+      const reqList = reqSnap.docs.map(d => ({id: d.id, ...d.data()}));
+      
+      // Auto-generar requisitos si está vacío
+      if (reqList.length === 0) {
+        const defaultReqs = [
+          { nombre: 'Copia de Cédula de Ciudadanía', subido: false, fecha: '' },
+          { nombre: 'Poder Firmado o Autenticado', subido: false, fecha: '' },
+          { nombre: 'Documentación Probatoria Base', subido: false, fecha: '' }
+        ];
+        for (const r of defaultReqs) {
+           const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', expId, 'requisitos'), r);
+           reqList.push({ id: docRef.id, ...r });
+        }
+      }
+
+      setSubDocs({
+        actuaciones: actSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => new Date(a.date) - new Date(b.date)),
+        pagos: pagosSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
+        tiempos: tiemposSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => new Date(b.fecha) - new Date(a.fecha)),
+        documentos: docsSnap.docs.map(d => ({id: d.id, ...d.data()})),
+        planPagos: planSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => new Date(a.fecha) - new Date(b.fecha)),
+        requisitos: reqList
+      });
+
+    } catch (err) {
+      console.error("Error obteniendo sub-colecciones", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddDocument = () => {
-    if (!newDocName.trim()) return;
-    setEditingClient(prev => ({
-      ...prev,
-      documentos: [ ...(prev.documentos || []), { name: newDocName + '.pdf', date: new Date().toLocaleDateString() } ]
-    }));
-    setNewDocName('');
+  // HANDLERS DIRECTOS A SUB-COLECCIONES
+  const handleAddDocument = async () => {
+    if (!newDocName.trim() || !editingClient) return;
+    setLoading(true);
+    try {
+      const newDocData = { name: newDocName + '.pdf', date: new Date().toLocaleDateString() };
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'documentos'), newDocData);
+      setSubDocs(prev => ({...prev, documentos: [...prev.documentos, { id: docRef.id, ...newDocData }]}));
+      setNewDocName('');
+    } catch(err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleAddTimeline = () => {
-    if (!newTimelineTitle.trim()) return;
-    setEditingClient(prev => ({
-      ...prev,
-      timeline: [ ...(prev.timeline || []), { title: newTimelineTitle, date: new Date().toLocaleDateString(), desc: 'Actualización procesal manual.', done: true } ]
-    }));
-    setNewTimelineTitle('');
+  const handleAddTimeline = async () => {
+    if (!newTimelineTitle.trim() || !editingClient) return;
+    setLoading(true);
+    try {
+      const newAct = { title: newTimelineTitle, date: new Date().toLocaleDateString(), desc: 'Actualización procesal manual.', done: true };
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'actuaciones'), newAct);
+      setSubDocs(prev => ({...prev, actuaciones: [...prev.actuaciones, { id: docRef.id, ...newAct }]}));
+      setNewTimelineTitle('');
+    } catch(err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleAddTimeEntry = () => {
-    if (!newTimeEntry.descripcion || !newTimeEntry.responsable || !newTimeEntry.horas) return;
-    setEditingClient(prev => ({
-      ...prev,
-      registroTiempos: [
-        ...(prev.registroTiempos || []),
-        { ...newTimeEntry, id: Date.now() }
-      ]
-    }));
-    setNewTimeEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', responsable: '', horas: '' });
+  const handleAddTimeEntry = async () => {
+    if (!newTimeEntry.descripcion || !newTimeEntry.responsable || !newTimeEntry.horas || !editingClient) return;
+    setLoading(true);
+    try {
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'tiempos'), newTimeEntry);
+      setSubDocs(prev => ({...prev, tiempos: [...prev.tiempos, { id: docRef.id, ...newTimeEntry }]}));
+      setNewTimeEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', responsable: '', horas: '' });
+    } catch(err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleAddPayment = () => {
-    if (!newPaymentEntry.descripcion || !newPaymentEntry.monto) return;
-    setEditingClient(prev => ({
-      ...prev,
-      pagos: [
-        ...(prev.pagos || []),
-        { ...newPaymentEntry, id: Date.now() }
-      ]
-    }));
-    setNewPaymentEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+  const handleAddPayment = async () => {
+    if (!newPaymentEntry.descripcion || !newPaymentEntry.monto || !editingClient) return;
+    setLoading(true);
+    try {
+      const montoCOP = parseCOP(newPaymentEntry.monto);
+      const newPymt = { fecha: newPaymentEntry.fecha, descripcion: newPaymentEntry.descripcion, monto: newPaymentEntry.monto, montoCOP };
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'pagos'), newPymt);
+      
+      const newTotalRecaudo = (Number(editingClient.totalRecaudoCOP) || 0) + montoCOP;
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id), { totalRecaudoCOP: newTotalRecaudo });
+
+      setEditingClient({...editingClient, totalRecaudoCOP: newTotalRecaudo});
+      setSubDocs(prev => ({...prev, pagos: [...prev.pagos, { id: docRef.id, ...newPymt }]}));
+      setNewPaymentEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+    } catch(err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleAddPlanEntry = () => {
-    if (!newPlanEntry.descripcion || !newPlanEntry.monto) return;
-    setEditingClient(prev => ({
-      ...prev,
-      planPagos: [
-        ...(prev.planPagos || []),
-        { ...newPlanEntry, id: Date.now() }
-      ]
-    }));
-    setNewPlanEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+  const handleAddPlanEntry = async () => {
+    if (!newPlanEntry.descripcion || !newPlanEntry.monto || !editingClient) return;
+    setLoading(true);
+    try {
+      const montoCOP = parseCOP(newPlanEntry.monto);
+      const newPlan = { ...newPlanEntry, montoCOP };
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'planPagos'), newPlan);
+      setSubDocs(prev => ({...prev, planPagos: [...prev.planPagos, { id: docRef.id, ...newPlan }]}));
+      setNewPlanEntry({ fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: '' });
+    } catch(err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleDeletePlanEntry = (id) => {
-    setEditingClient(prev => ({
-      ...prev,
-      planPagos: prev.planPagos.filter(entry => entry.id !== id)
-    }));
+  const handleDeletePlanEntry = async (id) => {
+    if (!editingClient) return;
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'planPagos', id));
+      setSubDocs(prev => ({...prev, planPagos: prev.planPagos.filter(entry => entry.id !== id)}));
+    } catch(err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleToggleRequirement = (reqId) => {
-    setEditingClient(prev => ({
-      ...prev,
-      documentosRequeridos: prev.documentosRequeridos.map(req => 
-        req.id === reqId ? { ...req, subido: !req.subido, fecha: !req.subido ? new Date().toLocaleDateString() : '' } : req
-      )
-    }));
+  const handleToggleRequirement = async (reqId, isUploaded) => {
+    if (!editingClient) return;
+    try {
+      const newState = !isUploaded;
+      const newDate = newState ? new Date().toLocaleDateString() : '';
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id, 'requisitos', reqId), { subido: newState, fecha: newDate });
+      setSubDocs(prev => ({...prev, requisitos: prev.requisitos.map(req => req.id === reqId ? { ...req, subido: newState, fecha: newDate } : req)}));
+    } catch(err) { console.error(err); }
   };
 
   const saveClientDetails = async (e) => {
@@ -2059,19 +2044,34 @@ const AdminDashboard = ({ onExit }) => {
     if (!db || !editingClient) return;
     setLoading(true);
     try {
-      const clientDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'clients', editingClient.id);
-      const { id, ...dataToSave } = editingClient; 
-      await updateDoc(clientDocRef, dataToSave);
+      // 1. Actualizar Cliente
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', editingClient.idCliente), {
+        nombres: editingClient.clienteInfo.nombres,
+        cedula_nit: editingClient.clienteInfo.cedula_nit,
+        telefono: editingClient.clienteInfo.telefono,
+        direccion: editingClient.clienteInfo.direccion,
+        email: editingClient.clienteInfo.email
+      });
+
+      // 2. Actualizar Expediente
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expedientes', editingClient.id), {
+        tipoCaso: editingClient.tipoCaso,
+        estadoActual: editingClient.estadoActual,
+        juzgado: editingClient.juzgado,
+        proximaAudiencia: editingClient.proximaAudiencia,
+        honorariosCOP: Number(editingClient.honorariosCOP) || 0,
+        formaPago: editingClient.formaPago || '',
+        estadoFacturacion: editingClient.estadoFacturacion || 'Al Día',
+        passwordTemporal: editingClient.passwordTemporal || ''
+      });
       
-      setSuccessMsg(`¡Expediente de ${editingClient.nombre} actualizado!`);
+      setSuccessMsg(`¡Expediente de ${editingClient.clienteInfo.nombres} actualizado exitosamente!`);
       setIsClientModalOpen(false);
       setEditingClient(null);
       setTimeout(() => setSuccessMsg(''), 4000);
-      
       await fetchData(); 
     } catch (error) {
-      console.error("Error actualizando cliente:", error);
-      setErrorMsg("Ocurrió un error al actualizar la ficha del cliente.");
+      setErrorMsg("Ocurrió un error al guardar la actualización.");
     } finally {
       setLoading(false);
     }
@@ -2099,25 +2099,11 @@ const AdminDashboard = ({ onExit }) => {
             <div>
               <div className="relative mb-4">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input 
-                  type="email" 
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="Correo de administrador"
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
-                  required
-                />
+                <input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="Correo de administrador" className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" required />
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                <input 
-                  type="password" 
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Contraseña maestra"
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" 
-                  required
-                />
+                <input type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)} placeholder="Contraseña maestra" className="w-full bg-slate-950 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-cyan-400 transition-colors" required />
               </div>
             </div>
             <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
@@ -2141,10 +2127,7 @@ const AdminDashboard = ({ onExit }) => {
             <p className="text-slate-400 mt-2">Métricas y gestión de ciclo de vida del cliente.</p>
           </div>
           <div className="flex gap-4 flex-wrap">
-            <button 
-              onClick={() => setShowOverviewModal(true)} 
-              className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
-            >
+            <button onClick={() => setShowOverviewModal(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2">
               <LayoutDashboard className="w-4 h-4" /> Resumen Ejecutivo
             </button>
             <button onClick={fetchData} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm hover:bg-white/10 transition-colors flex items-center gap-2">
@@ -2220,7 +2203,7 @@ const AdminDashboard = ({ onExit }) => {
                 <Briefcase className="w-5 h-5 text-indigo-400" />
               </div>
               <p className="text-3xl font-bold text-white">{clientsStats.total}</p>
-              <p className="text-xs text-slate-500 mt-2">Fichas creadas</p>
+              <p className="text-xs text-slate-500 mt-2">Expedientes activos</p>
             </div>
             <div className="bg-slate-900 border border-indigo-500/20 rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 blur-2xl rounded-full pointer-events-none" />
@@ -2254,7 +2237,7 @@ const AdminDashboard = ({ onExit }) => {
             <div className="bg-slate-900 border border-cyan-500/20 rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 blur-2xl rounded-full pointer-events-none" />
               <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Recaudo Real</p>
+                <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Recaudo</p>
                 <CheckCircle2 className="w-5 h-5 text-cyan-400" />
               </div>
               <p className="text-xl font-bold text-cyan-400 truncate mt-1">
@@ -2308,28 +2291,20 @@ const AdminDashboard = ({ onExit }) => {
                   ) : (
                     leads.filter(l => l.estado !== 'convertido').map((lead) => (
                       <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="p-4">
-                          <div className="font-semibold text-white">{lead.name}</div>
-                        </td>
+                        <td className="p-4"><div className="font-semibold text-white">{lead.nombre}</div></td>
                         <td className="p-4">
                           <div className="text-slate-300">{lead.email}</div>
-                          <div className="text-slate-500 text-xs mt-0.5">{lead.phone}</div>
+                          <div className="text-slate-500 text-xs mt-0.5">{lead.telefono}</div>
                         </td>
                         <td className="p-4">
                           <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs">
-                            {lead.interest === 'ia-legal' ? 'IA Legal' : lead.interest === 'vigilancia' ? 'Vigilancia Judicial' : lead.interest === 'consulta' ? 'Consulta Jurídica' : lead.interest === 'asesoria' ? 'Asesoría Jurídica' : 'Case Management'}
+                            {lead.interes === 'ia-legal' ? 'IA Legal' : lead.interes === 'vigilancia' ? 'Vigilancia Judicial' : lead.interes === 'consulta' ? 'Consulta Jurídica' : lead.interes === 'asesoria' ? 'Asesoría Jurídica' : 'Case Management'}
                           </span>
                         </td>
-                        <td className="p-4 text-slate-400">
-                          {new Date(lead.fechaRegistro).toLocaleDateString()}
-                        </td>
+                        <td className="p-4 text-slate-400">{new Date(lead.fechaRegistro).toLocaleDateString()}</td>
                         <td className="p-4 text-right">
-                          <button 
-                            onClick={() => openConversionModal(lead)}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-lg shadow-indigo-500/20"
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                            Convertir a Cliente
+                          <button onClick={() => openConversionModal(lead)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-lg shadow-indigo-500/20">
+                            <UserPlus className="w-3.5 h-3.5" /> Convertir a Cliente
                           </button>
                         </td>
                       </tr>
@@ -2352,32 +2327,32 @@ const AdminDashboard = ({ onExit }) => {
                   {loading && clients.length === 0 ? (
                     <tr><td colSpan="5" className="p-8 text-center text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />Cargando cartera de clientes...</td></tr>
                   ) : clients.length === 0 ? (
-                    <tr><td colSpan="5" className="p-8 text-center text-slate-500">Aún no hay clientes creados. Convierte un prospecto para empezar.</td></tr>
+                    <tr><td colSpan="5" className="p-8 text-center text-slate-500">Aún no hay expedientes creados. Convierte un prospecto para empezar.</td></tr>
                   ) : (
-                    clients.map((client) => (
-                      <tr key={client.id} className="hover:bg-white/[0.02] transition-colors">
+                    clients.map((expediente) => (
+                      <tr key={expediente.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="p-4">
-                          <div className="font-semibold text-white">{client.nombre}</div>
+                          <div className="font-semibold text-white">{expediente.clienteInfo?.nombres}</div>
                           <div className="text-slate-500 text-xs mt-0.5 flex gap-2">
-                             <span>CC: {client.cedula || 'N/A'}</span> • <span>{client.telefono || 'N/A'}</span>
+                             <span>CC: {expediente.clienteInfo?.cedula_nit || 'N/A'}</span> • <span>{expediente.clienteInfo?.telefono || 'N/A'}</span>
                           </div>
                         </td>
                         <td className="p-4">
                           <span className="font-mono text-xs text-indigo-300 bg-indigo-500/5 border border-indigo-500/20 rounded px-2 py-1 inline-block">
-                            {client.expediente}
+                            {expediente.radicadoInterno}
                           </span>
-                          <div className="text-xs text-slate-500 mt-1">Inicio: {client.fechaInicioContrato}</div>
+                          <div className="text-xs text-slate-500 mt-1">Inicio: {expediente.fechaInicioContrato}</div>
                         </td>
                         <td className="p-4">
                           <span className="px-2.5 py-1 bg-white/5 border border-white/10 text-slate-300 rounded-full text-xs mb-1 inline-block">
-                            {client.estadoActual}
+                            {expediente.estadoActual}
                           </span>
-                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{client.juzgado}</div>
+                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{expediente.juzgado}</div>
                         </td>
                         <td className="p-4 text-slate-300">
-                          {client.honorarios ? (
+                          {expediente.honorariosCOP ? (
                             <span className="font-bold text-emerald-400">
-                              {formatCOP(client.honorarios)}
+                              {formatCOP(expediente.honorariosCOP)}
                             </span>
                           ) : (
                             <span className="text-slate-600 italic text-xs">No fijado</span>
@@ -2385,7 +2360,7 @@ const AdminDashboard = ({ onExit }) => {
                         </td>
                         <td className="p-4 text-right">
                           <button 
-                            onClick={() => openClientDetail(client)}
+                            onClick={() => openClientDetail(expediente)}
                             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5"
                           >
                             <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
@@ -2407,7 +2382,6 @@ const AdminDashboard = ({ onExit }) => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsConversionModalOpen(false)} />
           <div className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up">
-            
             <div className="p-6 border-b border-white/10 bg-slate-950/50 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -2416,79 +2390,49 @@ const AdminDashboard = ({ onExit }) => {
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">Completa los datos administrativos para habilitar su expediente.</p>
               </div>
-              <button onClick={() => setIsConversionModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => setIsConversionModalOpen(false)} className="text-slate-400 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
             </div>
-
             <form onSubmit={submitConversion} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Nombres y Apellidos</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="text" value={conversionData.nombres} onChange={(e) => setConversionData({...conversionData, nombres: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                  </div>
+                  <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="text" value={conversionData.nombres} onChange={(e) => setConversionData({...conversionData, nombres: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" /></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Cédula de Ciudadanía / NIT</label>
-                  <div className="relative">
-                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="text" placeholder="Ej: 1020304050" value={conversionData.cedula} onChange={(e) => setConversionData({...conversionData, cedula: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                  </div>
+                  <div className="relative"><FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="text" placeholder="Ej: 1020304050" value={conversionData.cedula} onChange={(e) => setConversionData({...conversionData, cedula: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" /></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Correo Electrónico</label>
-                  <div className="relative">
-                    <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="email" value={conversionData.email} onChange={(e) => setConversionData({...conversionData, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                  </div>
+                  <div className="relative"><MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="email" value={conversionData.email} onChange={(e) => setConversionData({...conversionData, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" /></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Teléfono Celular</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="tel" value={conversionData.telefono} onChange={(e) => setConversionData({...conversionData, telefono: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                  </div>
+                  <div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="tel" value={conversionData.telefono} onChange={(e) => setConversionData({...conversionData, telefono: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" /></div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Dirección de Notificación / Residencia</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="text" placeholder="Ej: Cra 12 # 34 - 56, Bogotá" value={conversionData.direccion} onChange={(e) => setConversionData({...conversionData, direccion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                  </div>
+                  <div className="relative"><MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="text" placeholder="Ej: Cra 12 # 34 - 56, Bogotá" value={conversionData.direccion} onChange={(e) => setConversionData({...conversionData, direccion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" /></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Naturaleza del Caso</label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="text" value={conversionData.tipoCaso} onChange={(e) => setConversionData({...conversionData, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                  </div>
+                  <div className="relative"><Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="text" value={conversionData.tipoCaso} onChange={(e) => setConversionData({...conversionData, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none" /></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Fecha Inicio de Contrato</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input required type="date" value={conversionData.fechaInicio} onChange={(e) => setConversionData({...conversionData, fechaInicio: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none [color-scheme:dark]" />
-                  </div>
+                  <div className="relative"><Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input required type="date" value={conversionData.fechaInicio} onChange={(e) => setConversionData({...conversionData, fechaInicio: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:border-indigo-400 focus:outline-none [color-scheme:dark]" /></div>
                 </div>
               </div>
-
               <div className="pt-6 mt-2 border-t border-white/10 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsConversionModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={loading} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-2">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Formalizar Ingreso
-                </button>
+                <button type="button" onClick={() => setIsConversionModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors">Cancelar</button>
+                <button type="submit" disabled={loading} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-2">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Formalizar Ingreso</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL GESTIÓN DE CLIENTE EXISTENTE (TABS) --- */}
+      {/* --- MODAL GESTIÓN DE CLIENTE EXISTENTE (TABS Y SUBCOLECCIONES) --- */}
       {isClientModalOpen && editingClient && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsClientModalOpen(false)} />
@@ -2498,19 +2442,16 @@ const AdminDashboard = ({ onExit }) => {
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   <FolderOpen className="w-5 h-5 text-cyan-400" />
-                  Expediente: {editingClient.nombre}
+                  Expediente: {editingClient.clienteInfo.nombres}
                 </h3>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="font-mono text-xs text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{editingClient.expediente}</span>
+                  <span className="font-mono text-xs text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{editingClient.radicadoInterno}</span>
                   <span className="text-xs text-slate-400">Cliente desde: {editingClient.fechaInicioContrato}</span>
                 </div>
               </div>
-              <button onClick={() => setIsClientModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
-                <X className="w-6 h-6" />
-              </button>
+              <button onClick={() => setIsClientModalOpen(false)} className="text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
             </div>
 
-            {/* Pestañas de Navegación del Modal */}
             <div className="flex border-b border-white/10 bg-slate-950/30 px-6 shrink-0 overflow-x-auto">
               {[
                 { id: 'info', label: 'Datos del Cliente', icon: <User className="w-4 h-4"/> },
@@ -2518,11 +2459,7 @@ const AdminDashboard = ({ onExit }) => {
                 { id: 'docs', label: 'Documental', icon: <Paperclip className="w-4 h-4"/> },
                 { id: 'erp', label: 'ERP & Operación', icon: <Activity className="w-4 h-4"/> }
               ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setClientModalTab(tab.id)}
-                  className={`px-5 py-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${clientModalTab === tab.id ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-                >
+                <button key={tab.id} onClick={() => setClientModalTab(tab.id)} className={`px-5 py-4 text-sm font-bold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${clientModalTab === tab.id ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
                   {tab.icon} {tab.label}
                 </button>
               ))}
@@ -2538,23 +2475,23 @@ const AdminDashboard = ({ onExit }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nombre Completo / Titular</label>
-                        <input type="text" value={editingClient.nombre} onChange={(e) => setEditingClient({...editingClient, nombre: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        <input type="text" value={editingClient.clienteInfo.nombres} onChange={(e) => setEditingClient({...editingClient, clienteInfo: {...editingClient.clienteInfo, nombres: e.target.value}})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Cédula / NIT</label>
-                        <input type="text" value={editingClient.cedula || ''} onChange={(e) => setEditingClient({...editingClient, cedula: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        <input type="text" value={editingClient.clienteInfo.cedula_nit || ''} onChange={(e) => setEditingClient({...editingClient, clienteInfo: {...editingClient.clienteInfo, cedula_nit: e.target.value}})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Teléfono Celular</label>
-                        <input type="tel" value={editingClient.telefono || ''} onChange={(e) => setEditingClient({...editingClient, telefono: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        <input type="tel" value={editingClient.clienteInfo.telefono || ''} onChange={(e) => setEditingClient({...editingClient, clienteInfo: {...editingClient.clienteInfo, telefono: e.target.value}})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Correo Electrónico</label>
-                        <input type="email" value={editingClient.email || ''} onChange={(e) => setEditingClient({...editingClient, email: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        <input type="email" value={editingClient.clienteInfo.email || ''} onChange={(e) => setEditingClient({...editingClient, clienteInfo: {...editingClient.clienteInfo, email: e.target.value}})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Dirección de Residencia / Notificación</label>
-                        <input type="text" value={editingClient.direccion || ''} onChange={(e) => setEditingClient({...editingClient, direccion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                        <input type="text" value={editingClient.clienteInfo.direccion || ''} onChange={(e) => setEditingClient({...editingClient, clienteInfo: {...editingClient.clienteInfo, direccion: e.target.value}})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                       </div>
                     </div>
                   </div>
@@ -2571,16 +2508,12 @@ const AdminDashboard = ({ onExit }) => {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="block text-xs font-semibold text-slate-400 mb-1.5">Contraseña del Portal</label>
-                            <input type="text" value={editingClient.password} onChange={(e) => setEditingClient({...editingClient, password: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:border-cyan-400 focus:outline-none font-mono" />
+                            <input type="text" value={editingClient.passwordTemporal || ''} onChange={(e) => setEditingClient({...editingClient, passwordTemporal: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:border-cyan-400 focus:outline-none font-mono" />
                           </div>
                           <div>
                             <label className="block text-xs font-semibold text-slate-400 mb-1.5">Tipo de Caso</label>
                             <div className="relative">
-                              <select 
-                                value={editingClient.tipoCaso || 'Sin Asignar'} 
-                                onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} 
-                                className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none appearance-none cursor-pointer"
-                              >
+                              <select value={editingClient.tipoCaso || 'Sin Asignar'} onChange={(e) => setEditingClient({...editingClient, tipoCaso: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none appearance-none cursor-pointer">
                                 <option value="Sin Asignar" disabled>Seleccione...</option>
                                 <option value="Penal">Penal</option>
                                 <option value="Civil">Civil</option>
@@ -2601,15 +2534,15 @@ const AdminDashboard = ({ onExit }) => {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estado Actual</label>
-                          <input type="text" value={editingClient.estadoActual} onChange={(e) => setEditingClient({...editingClient, estadoActual: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                          <input type="text" value={editingClient.estadoActual || ''} onChange={(e) => setEditingClient({...editingClient, estadoActual: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-slate-400 mb-1.5">Juzgado Asignado</label>
-                          <input type="text" value={editingClient.juzgado} onChange={(e) => setEditingClient({...editingClient, juzgado: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                          <input type="text" value={editingClient.juzgado || ''} onChange={(e) => setEditingClient({...editingClient, juzgado: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-slate-400 mb-1.5">Próxima Audiencia</label>
-                          <input type="text" value={editingClient.proximaAudiencia} onChange={(e) => setEditingClient({...editingClient, proximaAudiencia: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+                          <input type="text" value={editingClient.proximaAudiencia || ''} onChange={(e) => setEditingClient({...editingClient, proximaAudiencia: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
                         </div>
                       </div>
                     </div>
@@ -2621,16 +2554,12 @@ const AdminDashboard = ({ onExit }) => {
                     </h4>
                     <div className="flex gap-2 mb-4">
                       <input type="text" placeholder="Nueva actuación procesal..." value={newTimelineTitle} onChange={(e) => setNewTimelineTitle(e.target.value)} className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-indigo-400 focus:outline-none" />
-                      <button onClick={handleAddTimeline} type="button" className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
-                        <Plus className="w-4 h-4" /> Añadir
-                      </button>
+                      <button onClick={handleAddTimeline} type="button" className="px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"><Plus className="w-4 h-4" /> Añadir</button>
                     </div>
                     <div className="space-y-3 overflow-y-auto pr-2 flex-1">
-                       {(!editingClient.timeline || editingClient.timeline.length === 0) && (
-                        <p className="text-xs text-slate-500 italic">No hay actuaciones registradas.</p>
-                      )}
-                      {editingClient.timeline?.map((step, i) => (
-                        <div key={i} className="flex gap-3">
+                       {subDocs.actuaciones.length === 0 && <p className="text-xs text-slate-500 italic">No hay actuaciones registradas.</p>}
+                       {subDocs.actuaciones.map((step) => (
+                        <div key={step.id} className="flex gap-3">
                           <div className="w-2 h-2 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
                           <div>
                             <p className="text-sm font-bold text-white leading-tight">{step.title}</p>
@@ -2651,18 +2580,11 @@ const AdminDashboard = ({ onExit }) => {
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Checklist de Ingreso
                     </h4>
                     <div className="space-y-2">
-                      {(!editingClient.documentosRequeridos || editingClient.documentosRequeridos.length === 0) && (
-                        <p className="text-xs text-slate-500 italic">No hay requisitos de ingreso definidos.</p>
-                      )}
-                      {editingClient.documentosRequeridos?.map(req => (
+                      {subDocs.requisitos.length === 0 && <p className="text-xs text-slate-500 italic">No hay requisitos de ingreso definidos.</p>}
+                      {subDocs.requisitos.map(req => (
                          <div key={req.id} className="flex justify-between items-center text-sm p-3 bg-slate-950/30 rounded border border-white/5 hover:bg-slate-950/50 transition-colors">
                             <div className="flex items-center gap-3">
-                              <input 
-                                type="checkbox" 
-                                checked={req.subido} 
-                                onChange={() => handleToggleRequirement(req.id)}
-                                className="w-4 h-4 rounded bg-slate-900 border-white/10 text-emerald-400 focus:ring-emerald-400 focus:ring-offset-slate-950 cursor-pointer"
-                              />
+                              <input type="checkbox" checked={req.subido} onChange={() => handleToggleRequirement(req.id, req.subido)} className="w-4 h-4 rounded bg-slate-900 border-white/10 text-emerald-400 focus:ring-emerald-400 focus:ring-offset-slate-950 cursor-pointer" />
                               <span className={req.subido ? "text-slate-500 line-through truncate" : "text-slate-200 truncate"}>{req.nombre}</span>
                             </div>
                             <span className={`shrink-0 ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${req.subido ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-400"}`}>
@@ -2678,27 +2600,18 @@ const AdminDashboard = ({ onExit }) => {
                       <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                         <Paperclip className="w-4 h-4 text-cyan-400" /> Repositorio General
                       </h4>
-                      <button 
-                        onClick={() => window.open(`https://drive.google.com/drive/search?q=${editingClient.id}`, '_blank')}
-                        className="text-xs px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-cyan-400 border border-white/10 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
-                        title={`ID Interno de Carpeta: ${editingClient.id}`}
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Abrir Carpeta Nube
+                      <button onClick={() => window.open(`https://drive.google.com/drive/search?q=${editingClient.id}`, '_blank')} className="text-xs px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-cyan-400 border border-white/10 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm">
+                        <ExternalLink className="w-3.5 h-3.5" /> Abrir Carpeta Nube
                       </button>
                     </div>
                     <div className="flex gap-2 mb-4">
                       <input type="text" placeholder="Nombre del nuevo documento..." value={newDocName} onChange={(e) => setNewDocName(e.target.value)} className="flex-1 bg-slate-950 border border-white/10 rounded-lg py-1.5 px-3 text-sm text-white focus:border-cyan-400 focus:outline-none" />
-                      <button onClick={handleAddDocument} type="button" className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
-                        <Plus className="w-4 h-4" /> Adjuntar
-                      </button>
+                      <button onClick={handleAddDocument} type="button" className="px-3 py-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"><Plus className="w-4 h-4" /> Adjuntar</button>
                     </div>
-                    <div className="space-y-2 overflow-y-auto pr-2">
-                      {(!editingClient.documentos || editingClient.documentos.length === 0) && (
-                        <p className="text-xs text-slate-500 italic">No hay documentos adjuntos aún.</p>
-                      )}
-                      {editingClient.documentos?.map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                    <div className="space-y-2 overflow-y-auto pr-2 max-h-48">
+                      {subDocs.documentos.length === 0 && <p className="text-xs text-slate-500 italic">No hay documentos adjuntos aún.</p>}
+                      {subDocs.documentos.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
                           <div className="flex items-center gap-2 overflow-hidden">
                             <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
                             <span className="text-sm text-slate-300 truncate">{doc.name}</span>
@@ -2714,65 +2627,37 @@ const AdminDashboard = ({ onExit }) => {
               {/* TAB 3: ERP & OPERACIÓN */}
               {clientModalTab === 'erp' && (
                 <div className="space-y-8 animate-fade-in">
-                  
-                  {/* Tarjetas Financieras */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-emerald-400" /> Pacto de Honorarios
-                      </h4>
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" /> Pacto de Honorarios</h4>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Valor Total (COP)</label>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                          <input 
-                            type="text" 
-                            placeholder="Ej: $ 5.000.000" 
-                            value={editingClient.honorarios} 
-                            onChange={(e) => setEditingClient({...editingClient, honorarios: e.target.value})} 
-                            onBlur={(e) => setEditingClient({...editingClient, honorarios: formatCOP(e.target.value)})}
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-emerald-400 focus:outline-none font-bold text-emerald-400" 
-                          />
+                          <input type="text" placeholder="Ej: $ 5.000.000" value={editingClient.honorariosCOP === 0 ? '' : formatCOP(editingClient.honorariosCOP)} onChange={(e) => setEditingClient({...editingClient, honorariosCOP: parseCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-emerald-400 focus:outline-none font-bold text-emerald-400" />
                         </div>
                       </div>
                     </div>
-
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-cyan-400" /> Efectivamente Pagado
-                      </h4>
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-cyan-400" /> Efectivamente Pagado</h4>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Suma de Pagos Recibidos</label>
-                        <p className="text-2xl font-bold text-cyan-400 mt-1">
-                           {formatCOP((editingClient.pagos || []).reduce((sum, p) => sum + parseCOP(p.monto), 0))}
-                        </p>
+                        <p className="text-2xl font-bold text-cyan-400 mt-1">{formatCOP(editingClient.totalRecaudoCOP)}</p>
                       </div>
                     </div>
-
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-yellow-400" /> Saldo Pendiente
-                      </h4>
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2"><Activity className="w-4 h-4 text-yellow-400" /> Saldo Pendiente</h4>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Por Cobrar</label>
-                        <p className="text-2xl font-bold text-yellow-400 mt-1">
-                           {formatCOP(parseCOP(editingClient.honorarios) - (editingClient.pagos || []).reduce((sum, p) => sum + parseCOP(p.monto), 0))}
-                        </p>
+                        <p className="text-2xl font-bold text-yellow-400 mt-1">{formatCOP((Number(editingClient.honorariosCOP) || 0) - (Number(editingClient.totalRecaudoCOP) || 0))}</p>
                       </div>
                     </div>
-                    
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-indigo-400" /> Estado de Facturación
-                      </h4>
+                      <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center gap-2"><CreditCard className="w-4 h-4 text-indigo-400" /> Estado de Facturación</h4>
                       <div>
                         <label className="block text-xs font-semibold text-slate-400 mb-1.5">Estatus Actual</label>
                         <div className="relative">
-                          <select 
-                            value={editingClient.estadoFacturacion || 'Al Día'} 
-                            onChange={(e) => setEditingClient({...editingClient, estadoFacturacion: e.target.value})} 
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-3 pr-10 text-sm text-white focus:border-indigo-400 focus:outline-none appearance-none cursor-pointer"
-                          >
+                          <select value={editingClient.estadoFacturacion || 'Al Día'} onChange={(e) => setEditingClient({...editingClient, estadoFacturacion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded-lg py-2 pl-3 pr-10 text-sm text-white focus:border-indigo-400 focus:outline-none appearance-none cursor-pointer">
                             <option value="Al Día">Al Día (Pagado)</option>
                             <option value="Pendiente">Pendiente de Cobro</option>
                             <option value="En Mora">En Mora</option>
@@ -2783,234 +2668,117 @@ const AdminDashboard = ({ onExit }) => {
                     </div>
                   </div>
 
-                  {/* Forma de Pago (General) */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-white mb-2 uppercase tracking-wider flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-slate-400" /> Condiciones y Forma de Pago
-                    </h4>
-                    <p className="text-xs text-slate-400 mb-3">Describe la modalidad de pago general estipulada en el contrato (ej. 50% anticipo, 50% contra éxito, cuotas mensuales, etc.)</p>
-                    <textarea 
-                      value={editingClient.formaPago} 
-                      onChange={(e) => setEditingClient({...editingClient, formaPago: e.target.value})} 
-                      placeholder="Ej: El cliente pagará mediante transferencia bancaria. El 50% al inicio de la gestión y el 50% restante al momento de emitirse el fallo..."
-                      className="w-full bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-slate-300 focus:border-purple-400 focus:outline-none resize-none h-20"
-                    />
+                    <h4 className="text-sm font-bold text-white mb-2 uppercase tracking-wider flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400" /> Condiciones y Forma de Pago</h4>
+                    <textarea value={editingClient.formaPago || ''} onChange={(e) => setEditingClient({...editingClient, formaPago: e.target.value})} placeholder="Ej: El cliente pagará mediante transferencia bancaria. El 50% al inicio..." className="w-full bg-slate-950 border border-white/10 rounded-lg p-3 text-sm text-slate-300 focus:border-purple-400 focus:outline-none resize-none h-20" />
                   </div>
 
-                  {/* Plan de Pagos Acordado */}
+                  {/* Plan de Pagos */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
                     <div className="p-5 border-b border-white/5 bg-slate-950/30 flex justify-between items-center">
-                      <div>
-                        <h4 className="text-white font-bold flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-purple-400" /> Plan de Pagos Acordado
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-1">Registra la forma de pago, hitos y fechas establecidas en el contrato.</p>
-                      </div>
+                      <div><h4 className="text-white font-bold flex items-center gap-2"><Calendar className="w-4 h-4 text-purple-400" /> Plan de Pagos Acordado</h4></div>
                     </div>
-                    
                     <div className="p-4 bg-slate-900/50 border-b border-white/5 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Fecha Esperada</label>
-                        <input type="date" value={newPlanEntry.fecha} onChange={e => setNewPlanEntry({...newPlanEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" />
-                      </div>
-                      <div className="md:col-span-6">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Hito / Descripción</label>
-                        <input type="text" placeholder="Ej: 50% al firmar poder..." value={newPlanEntry.descripcion} onChange={e => setNewPlanEntry({...newPlanEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
-                      </div>
-                      <div className="md:col-span-3">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Monto (COP)</label>
-                        <input type="text" placeholder="Ej: 2500000" value={newPlanEntry.monto} onChange={e => setNewPlanEntry({...newPlanEntry, monto: e.target.value})} onBlur={e => setNewPlanEntry({...newPlanEntry, monto: formatCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" />
-                      </div>
-                      <div className="md:col-span-1">
-                        <button onClick={handleAddPlanEntry} type="button" className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold transition-colors h-[30px]">
-                          + Add
-                        </button>
-                      </div>
+                      <div className="md:col-span-2"><label className="block text-xs text-slate-400 mb-1">Fecha</label><input type="date" value={newPlanEntry.fecha} onChange={e => setNewPlanEntry({...newPlanEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" /></div>
+                      <div className="md:col-span-6"><label className="block text-xs text-slate-400 mb-1">Descripción</label><input type="text" placeholder="Ej: 50% al firmar poder" value={newPlanEntry.descripcion} onChange={e => setNewPlanEntry({...newPlanEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" /></div>
+                      <div className="md:col-span-3"><label className="block text-xs text-slate-400 mb-1">Monto</label><input type="text" placeholder="2500000" value={newPlanEntry.monto} onChange={e => setNewPlanEntry({...newPlanEntry, monto: e.target.value})} onBlur={e => setNewPlanEntry({...newPlanEntry, monto: formatCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" /></div>
+                      <div className="md:col-span-1"><button onClick={handleAddPlanEntry} type="button" className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold transition-colors h-[30px]">+ Add</button></div>
                     </div>
-
                     <div className="max-h-64 overflow-y-auto">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-950/80 sticky top-0 text-slate-400 text-xs">
-                          <tr>
-                            <th className="p-3 font-medium">Fecha Esperada</th>
-                            <th className="p-3 font-medium">Descripción / Hito</th>
-                            <th className="p-3 font-medium text-right">Monto Esperado</th>
-                            <th className="p-3 font-medium text-center w-10"></th>
-                          </tr>
+                          <tr><th className="p-3 font-medium">Fecha</th><th className="p-3 font-medium">Descripción</th><th className="p-3 font-medium text-right">Monto</th><th className="p-3 text-center"></th></tr>
                         </thead>
                         <tbody className="divide-y divide-white/5 text-slate-300">
-                          {(!editingClient.planPagos || editingClient.planPagos.length === 0) ? (
-                            <tr><td colSpan="4" className="p-6 text-center text-xs text-slate-500">No hay plan de pagos acordado.</td></tr>
-                          ) : (
-                            editingClient.planPagos.map((entry) => (
-                              <tr key={entry.id} className="hover:bg-white/[0.02]">
-                                <td className="p-3 text-xs">{entry.fecha}</td>
-                                <td className="p-3 text-sm">{entry.descripcion}</td>
-                                <td className="p-3 text-right font-mono text-purple-400">
-                                  {formatCOP(entry.monto)}
-                                 </td>
-                                <td className="p-3 text-center">
-                                  <button onClick={() => handleDeletePlanEntry(entry.id)} className="text-red-400 hover:text-red-300 p-1" title="Eliminar hito">
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
+                          {subDocs.planPagos.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-xs text-slate-500">No hay plan de pagos acordado.</td></tr>}
+                          {subDocs.planPagos.map((entry) => (
+                            <tr key={entry.id} className="hover:bg-white/[0.02]">
+                              <td className="p-3 text-xs">{entry.fecha}</td>
+                              <td className="p-3 text-sm">{entry.descripcion}</td>
+                              <td className="p-3 text-right font-mono text-purple-400">{formatCOP(entry.montoCOP)}</td>
+                              <td className="p-3 text-center"><button onClick={() => handleDeletePlanEntry(entry.id)} className="text-red-400 hover:text-red-300 p-1"><X className="w-4 h-4" /></button></td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
 
-                  {/* Registro de Pagos y Abonos */}
+                  {/* Pagos Reales */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
                     <div className="p-5 border-b border-white/5 bg-slate-950/30 flex justify-between items-center">
-                      <div>
-                        <h4 className="text-white font-bold flex items-center gap-2">
-                          <Wallet className="w-4 h-4 text-emerald-400" /> Control de Pagos y Abonos
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-1">Registra los pagos parciales o totales realizados por el cliente.</p>
-                      </div>
+                      <div><h4 className="text-white font-bold flex items-center gap-2"><Wallet className="w-4 h-4 text-emerald-400" /> Control de Pagos y Abonos</h4></div>
                     </div>
-                    
                     <div className="p-4 bg-slate-900/50 border-b border-white/5 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Fecha</label>
-                        <input type="date" value={newPaymentEntry.fecha} onChange={e => setNewPaymentEntry({...newPaymentEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" />
-                      </div>
-                      <div className="md:col-span-6">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Descripción del Pago</label>
-                        <input type="text" placeholder="Ej: Transferencia Bancolombia - Cuota 1..." value={newPaymentEntry.descripcion} onChange={e => setNewPaymentEntry({...newPaymentEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
-                      </div>
-                      <div className="md:col-span-3">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Monto (COP)</label>
-                        <input type="text" placeholder="Ej: 2000000" value={newPaymentEntry.monto} onChange={e => setNewPaymentEntry({...newPaymentEntry, monto: e.target.value})} onBlur={e => setNewPaymentEntry({...newPaymentEntry, monto: formatCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" />
-                      </div>
-                      <div className="md:col-span-1">
-                        <button onClick={handleAddPayment} type="button" className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors h-[30px]">
-                          + Add
-                        </button>
-                      </div>
+                      <div className="md:col-span-2"><label className="block text-xs text-slate-400 mb-1">Fecha</label><input type="date" value={newPaymentEntry.fecha} onChange={e => setNewPaymentEntry({...newPaymentEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" /></div>
+                      <div className="md:col-span-6"><label className="block text-xs text-slate-400 mb-1">Descripción del Pago</label><input type="text" placeholder="Transferencia Bancolombia..." value={newPaymentEntry.descripcion} onChange={e => setNewPaymentEntry({...newPaymentEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" /></div>
+                      <div className="md:col-span-3"><label className="block text-xs text-slate-400 mb-1">Monto (COP)</label><input type="text" placeholder="2000000" value={newPaymentEntry.monto} onChange={e => setNewPaymentEntry({...newPaymentEntry, monto: e.target.value})} onBlur={e => setNewPaymentEntry({...newPaymentEntry, monto: formatCOP(e.target.value)})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-right" /></div>
+                      <div className="md:col-span-1"><button onClick={handleAddPayment} type="button" className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors h-[30px]">+ Add</button></div>
                     </div>
-
                     <div className="max-h-48 overflow-y-auto">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-950/80 sticky top-0 text-slate-400 text-xs">
-                          <tr>
-                            <th className="p-3 font-medium">Fecha</th>
-                            <th className="p-3 font-medium">Descripción</th>
-                            <th className="p-3 font-medium text-right">Monto Registrado</th>
-                          </tr>
+                          <tr><th className="p-3 font-medium">Fecha</th><th className="p-3 font-medium">Descripción</th><th className="p-3 font-medium text-right">Monto Registrado</th></tr>
                         </thead>
                         <tbody className="divide-y divide-white/5 text-slate-300">
-                          {(!editingClient.pagos || editingClient.pagos.length === 0) ? (
-                            <tr><td colSpan="3" className="p-6 text-center text-xs text-slate-500">No hay abonos registrados.</td></tr>
-                          ) : (
-                            editingClient.pagos.map((entry) => (
-                              <tr key={entry.id} className="hover:bg-white/[0.02]">
-                                <td className="p-3 text-xs">{entry.fecha}</td>
-                                <td className="p-3 text-sm">{entry.descripcion}</td>
-                                <td className="p-3 text-right font-mono text-emerald-400">
-                                  {formatCOP(entry.monto)}
-                                </td>
-                              </tr>
-                            ))
-                          )}
+                          {subDocs.pagos.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-xs text-slate-500">No hay abonos registrados.</td></tr>}
+                          {subDocs.pagos.map((entry) => (
+                            <tr key={entry.id} className="hover:bg-white/[0.02]">
+                              <td className="p-3 text-xs">{entry.fecha}</td>
+                              <td className="p-3 text-sm">{entry.descripcion}</td>
+                              <td className="p-3 text-right font-mono text-emerald-400">{formatCOP(entry.montoCOP)}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
 
-                  {/* Registro de Tiempos */}
+                  {/* Tiempos */}
                   <div className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden">
                     <div className="p-5 border-b border-white/5 bg-slate-950/30 flex justify-between items-center">
-                      <div>
-                        <h4 className="text-white font-bold flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-blue-400" /> Registro de Tiempos y Tareas
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-1">Lleva el control de horas facturables invertidas por tu equipo.</p>
-                      </div>
+                      <div><h4 className="text-white font-bold flex items-center gap-2"><Clock className="w-4 h-4 text-blue-400" /> Registro de Tiempos y Tareas</h4></div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-blue-400">
-                          {editingClient.registroTiempos?.reduce((sum, t) => sum + Number(t.horas), 0).toFixed(1) || '0.0'}
-                        </p>
+                        <p className="text-2xl font-bold text-blue-400">{subDocs.tiempos?.reduce((sum, t) => sum + Number(t.horas), 0).toFixed(1) || '0.0'}</p>
                         <p className="text-xs text-slate-500">Horas totales</p>
                       </div>
                     </div>
-                    
-                    {/* Formulario de nuevo tiempo */}
                     <div className="p-4 bg-slate-900/50 border-b border-white/5 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Fecha</label>
-                        <input type="date" value={newTimeEntry.fecha} onChange={e => setNewTimeEntry({...newTimeEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" />
-                      </div>
-                      <div className="md:col-span-5">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Tarea Realizada</label>
-                        <input type="text" placeholder="Ej: Redacción de tutela..." value={newTimeEntry.descripcion} onChange={e => setNewTimeEntry({...newTimeEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
-                      </div>
-                      <div className="md:col-span-3">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Responsable</label>
-                        <input type="text" placeholder="Ej: Dr. Gómez" value={newTimeEntry.responsable} onChange={e => setNewTimeEntry({...newTimeEntry, responsable: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" />
-                      </div>
-                      <div className="md:col-span-1">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Hrs</label>
-                        <input type="number" step="0.1" min="0" placeholder="1.5" value={newTimeEntry.horas} onChange={e => setNewTimeEntry({...newTimeEntry, horas: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-center" />
-                      </div>
-                      <div className="md:col-span-1">
-                        <button onClick={handleAddTimeEntry} type="button" className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition-colors h-[30px]">
-                          + Add
-                        </button>
-                      </div>
+                      <div className="md:col-span-2"><label className="block text-xs text-slate-400 mb-1">Fecha</label><input type="date" value={newTimeEntry.fecha} onChange={e => setNewTimeEntry({...newTimeEntry, fecha: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white [color-scheme:dark]" /></div>
+                      <div className="md:col-span-5"><label className="block text-xs text-slate-400 mb-1">Tarea Realizada</label><input type="text" placeholder="Ej: Redacción de demanda..." value={newTimeEntry.descripcion} onChange={e => setNewTimeEntry({...newTimeEntry, descripcion: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" /></div>
+                      <div className="md:col-span-3"><label className="block text-xs text-slate-400 mb-1">Responsable</label><input type="text" placeholder="Dr. Gómez" value={newTimeEntry.responsable} onChange={e => setNewTimeEntry({...newTimeEntry, responsable: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white" /></div>
+                      <div className="md:col-span-1"><label className="block text-xs text-slate-400 mb-1">Hrs</label><input type="number" step="0.1" min="0" placeholder="1.5" value={newTimeEntry.horas} onChange={e => setNewTimeEntry({...newTimeEntry, horas: e.target.value})} className="w-full bg-slate-950 border border-white/10 rounded py-1.5 px-2 text-xs text-white text-center" /></div>
+                      <div className="md:col-span-1"><button onClick={handleAddTimeEntry} type="button" className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold transition-colors h-[30px]">+ Add</button></div>
                     </div>
-
-                    {/* Tabla de tiempos */}
                     <div className="max-h-48 overflow-y-auto">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-950/80 sticky top-0 text-slate-400 text-xs">
-                          <tr>
-                            <th className="p-3 font-medium">Fecha</th>
-                            <th className="p-3 font-medium">Descripción</th>
-                            <th className="p-3 font-medium">Responsable</th>
-                            <th className="p-3 font-medium text-right">Horas</th>
-                          </tr>
+                          <tr><th className="p-3 font-medium">Fecha</th><th className="p-3 font-medium">Descripción</th><th className="p-3 font-medium">Responsable</th><th className="p-3 font-medium text-right">Horas</th></tr>
                         </thead>
                         <tbody className="divide-y divide-white/5 text-slate-300">
-                          {(!editingClient.registroTiempos || editingClient.registroTiempos.length === 0) ? (
-                            <tr><td colSpan="4" className="p-6 text-center text-xs text-slate-500">No hay registros de tiempo todavía.</td></tr>
-                          ) : (
-                            editingClient.registroTiempos.map((entry) => (
-                              <tr key={entry.id} className="hover:bg-white/[0.02]">
-                                <td className="p-3 text-xs">{entry.fecha}</td>
-                                <td className="p-3 text-sm">{entry.descripcion}</td>
-                                <td className="p-3">
-                                  <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-white/5">
-                                    <UserCheck className="w-3 h-3 text-indigo-400" />
-                                    {entry.responsable}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-right font-mono text-cyan-400">{Number(entry.horas).toFixed(1)}</td>
-                              </tr>
-                            ))
-                          )}
+                          {subDocs.tiempos.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-xs text-slate-500">No hay registros de tiempo todavía.</td></tr>}
+                          {subDocs.tiempos.map((entry) => (
+                            <tr key={entry.id} className="hover:bg-white/[0.02]">
+                              <td className="p-3 text-xs">{entry.fecha}</td>
+                              <td className="p-3 text-sm">{entry.descripcion}</td>
+                              <td className="p-3"><span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-white/5"><UserCheck className="w-3 h-3 text-indigo-400" /> {entry.responsable}</span></td>
+                              <td className="p-3 text-right font-mono text-cyan-400">{Number(entry.horas).toFixed(1)}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
-
                 </div>
               )}
             </div>
 
             <div className="p-6 border-t border-white/10 bg-slate-950/50 flex justify-end gap-3 shrink-0">
-              <button type="button" onClick={() => setIsClientModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors">
-                Cerrar sin guardar
-              </button>
+              <button type="button" onClick={() => setIsClientModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-white/5 transition-colors">Cerrar sin guardar</button>
               <button onClick={saveClientDetails} disabled={loading} className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold shadow-lg shadow-cyan-500/25 transition-all flex items-center gap-2">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                Guardar Expediente
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Guardar Expediente
               </button>
             </div>
-
           </div>
         </div>
       )}
@@ -3047,140 +2815,63 @@ const AdminDashboard = ({ onExit }) => {
                 </div>
               ) : (
                 <>
-                  {/* --- TOP KPIs --- */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-slate-950/50 border border-white/5 p-6 rounded-2xl flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
-                        <Users className="w-6 h-6 text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Prospectos</p>
-                        <p className="text-3xl font-extrabold text-white">{leadsStats.total}</p>
-                      </div>
+                      <div className="w-14 h-14 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0"><Users className="w-6 h-6 text-blue-400" /></div>
+                      <div><p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Prospectos</p><p className="text-3xl font-extrabold text-white">{leadsStats.total}</p></div>
                     </div>
-                    
                     <div className="bg-slate-950/50 border border-white/5 p-6 rounded-2xl flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                        <FolderOpen className="w-6 h-6 text-indigo-400" />
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Casos Activos</p>
-                        <p className="text-3xl font-extrabold text-white">{clientsStats.activeCases}</p>
-                      </div>
+                      <div className="w-14 h-14 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0"><FolderOpen className="w-6 h-6 text-indigo-400" /></div>
+                      <div><p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Casos Activos</p><p className="text-3xl font-extrabold text-white">{clientsStats.activeCases}</p></div>
                     </div>
-
                     <div className="bg-slate-950/50 border border-white/5 p-6 rounded-2xl flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                        <DollarSign className="w-6 h-6 text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Recaudo Total</p>
-                        <p className="text-2xl font-extrabold text-emerald-400">{formatCOP(clientsStats.totalRecaudo)}</p>
-                      </div>
+                      <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0"><DollarSign className="w-6 h-6 text-emerald-400" /></div>
+                      <div><p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Recaudo Total</p><p className="text-2xl font-extrabold text-emerald-400">{formatCOP(clientsStats.totalRecaudo)}</p></div>
                     </div>
                   </div>
 
-                  {/* --- GRAFICOS Y DESGLOSE --- */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* Gráfico 1: Salud Financiera (Progress Bar Custom) */}
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-6">
                       <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                         <PieChart className="w-4 h-4 text-emerald-400" /> Salud Financiera
                       </h4>
-                      
                       {(() => {
                         const recaudoPorcentaje = clientsStats.totalHonorarios ? Math.round((clientsStats.totalRecaudo / clientsStats.totalHonorarios) * 100) : 0;
                         const saldoPorcentaje = clientsStats.totalHonorarios ? 100 - recaudoPorcentaje : 0;
-                        
                         return (
                           <div className="space-y-6">
                             <div>
-                              <div className="flex justify-between text-xs mb-2">
-                                <span className="text-slate-400">Meta / Proyección Total</span>
-                                <span className="font-bold text-white">{formatCOP(clientsStats.totalHonorarios)}</span>
-                              </div>
+                              <div className="flex justify-between text-xs mb-2"><span className="text-slate-400">Meta / Proyección Total</span><span className="font-bold text-white">{formatCOP(clientsStats.totalHonorarios)}</span></div>
                               <div className="w-full h-8 flex rounded-lg overflow-hidden border border-white/10">
-                                <div style={{width: `${recaudoPorcentaje}%`}} className="bg-emerald-500 relative flex items-center justify-center group transition-all duration-1000">
-                                  {recaudoPorcentaje > 10 && <span className="text-[10px] font-bold text-emerald-950">{recaudoPorcentaje}%</span>}
-                                </div>
-                                <div style={{width: `${saldoPorcentaje}%`}} className="bg-yellow-500/80 relative flex items-center justify-center group transition-all duration-1000">
-                                  {saldoPorcentaje > 10 && <span className="text-[10px] font-bold text-yellow-950">{saldoPorcentaje}%</span>}
-                                </div>
+                                <div style={{width: `${recaudoPorcentaje}%`}} className="bg-emerald-500 relative flex items-center justify-center group transition-all duration-1000">{recaudoPorcentaje > 10 && <span className="text-[10px] font-bold text-emerald-950">{recaudoPorcentaje}%</span>}</div>
+                                <div style={{width: `${saldoPorcentaje}%`}} className="bg-yellow-500/80 relative flex items-center justify-center group transition-all duration-1000">{saldoPorcentaje > 10 && <span className="text-[10px] font-bold text-yellow-950">{saldoPorcentaje}%</span>}</div>
                               </div>
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-4 mt-4">
-                              <div className="flex items-start gap-3">
-                                <div className="w-3 h-3 rounded bg-emerald-500 mt-1 shrink-0" />
-                                <div>
-                                  <p className="text-xs text-slate-400">Recaudado</p>
-                                  <p className="text-sm font-bold text-white">{formatCOP(clientsStats.totalRecaudo)}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-start gap-3">
-                                <div className="w-3 h-3 rounded bg-yellow-500/80 mt-1 shrink-0" />
-                                <div>
-                                  <p className="text-xs text-slate-400">Saldo Pendiente</p>
-                                  <p className="text-sm font-bold text-white">{formatCOP(clientsStats.saldoPendiente)}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-6 flex items-center justify-between bg-purple-500/10 p-3.5 rounded-xl border border-purple-500/20">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
-                                  <Calendar className="w-4 h-4 text-purple-400" />
-                                </div>
-                                <div>
-                                  <span className="text-xs text-purple-300 font-bold block uppercase tracking-wider">Próximos 15 Días</span>
-                                  <span className="text-[10px] text-purple-400/70">Pagos programados por cobrar</span>
-                                </div>
-                              </div>
-                              <span className="text-lg font-bold text-purple-400">{formatCOP(clientsStats.totalProximosPagos)}</span>
+                              <div className="flex items-start gap-3"><div className="w-3 h-3 rounded bg-emerald-500 mt-1 shrink-0" /><div><p className="text-xs text-slate-400">Recaudado</p><p className="text-sm font-bold text-white">{formatCOP(clientsStats.totalRecaudo)}</p></div></div>
+                              <div className="flex items-start gap-3"><div className="w-3 h-3 rounded bg-yellow-500/80 mt-1 shrink-0" /><div><p className="text-xs text-slate-400">Saldo Pendiente</p><p className="text-sm font-bold text-white">{formatCOP(clientsStats.saldoPendiente)}</p></div></div>
                             </div>
                           </div>
                         );
                       })()}
                     </div>
 
-                    {/* Gráfico 2: Distribución de Casos por Área */}
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-6">
                       <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                         <Layers className="w-4 h-4 text-cyan-400" /> Distribución de Casos
                       </h4>
-                      
                       {(() => {
                         if (clients.length === 0) return <p className="text-sm text-slate-500 italic">No hay casos registrados aún.</p>;
-                        
-                        const caseTypes = clients.reduce((acc, c) => {
-                           const t = c.tipoCaso || 'Sin Clasificar';
-                           acc[t] = (acc[t] || 0) + 1;
-                           return acc;
-                        }, {});
-                        
+                        const caseTypes = clients.reduce((acc, c) => { const t = c.tipoCaso || 'Sin Clasificar'; acc[t] = (acc[t] || 0) + 1; return acc; }, {});
                         const colors = ['bg-cyan-400', 'bg-indigo-500', 'bg-purple-500', 'bg-emerald-400', 'bg-pink-500', 'bg-yellow-400'];
-                        const caseArray = Object.entries(caseTypes)
-                          .map(([name, count], index) => ({ name, count, percent: Math.round((count/clients.length)*100), color: colors[index % colors.length] }))
-                          .sort((a,b) => b.count - a.count);
-
+                        const caseArray = Object.entries(caseTypes).map(([name, count], index) => ({ name, count, percent: Math.round((count/clients.length)*100), color: colors[index % colors.length] })).sort((a,b) => b.count - a.count);
                         return (
                           <div>
-                            {/* Barra Segmentada */}
-                            <div className="w-full h-4 flex rounded-full overflow-hidden border border-white/10 mb-6">
-                              {caseArray.map((item, i) => (
-                                <div key={i} style={{width: `${item.percent}%`}} className={`${item.color} transition-all duration-1000`} title={`${item.name} (${item.percent}%)`} />
-                              ))}
-                            </div>
-                            
-                            {/* Leyenda */}
+                            <div className="w-full h-4 flex rounded-full overflow-hidden border border-white/10 mb-6">{caseArray.map((item, i) => (<div key={i} style={{width: `${item.percent}%`}} className={`${item.color} transition-all duration-1000`} title={`${item.name} (${item.percent}%)`} />))}</div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                               {caseArray.map((item, i) => (
                                 <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/30 border border-white/5">
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <div className={`w-3 h-3 rounded-full ${item.color} shrink-0`} />
-                                    <span className="text-xs text-slate-300 truncate">{item.name}</span>
-                                  </div>
+                                  <div className="flex items-center gap-2 overflow-hidden"><div className={`w-3 h-3 rounded-full ${item.color} shrink-0`} /><span className="text-xs text-slate-300 truncate">{item.name}</span></div>
                                   <span className="text-xs font-bold text-white shrink-0 ml-2">{item.count}</span>
                                 </div>
                               ))}
@@ -3190,22 +2881,16 @@ const AdminDashboard = ({ onExit }) => {
                       })()}
                     </div>
 
-                    {/* Gráfico 3: Intereses de Prospectos (Mini Bar Chart Vertical) */}
                     <div className="bg-white/5 border border-white/5 rounded-2xl p-6 lg:col-span-2">
                       <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                         <BarChart3 className="w-4 h-4 text-blue-400" /> Demanda de Servicios (Leads)
                       </h4>
-                      
                       {(() => {
                         if (leads.length === 0) return <p className="text-sm text-slate-500 italic">No hay prospectos registrados aún.</p>;
-                        
                         const interestTypes = { 'consulta': 0, 'asesoria': 0, 'ia-legal': 0, 'vigilancia': 0, 'case-management': 0 };
-                        leads.forEach(l => { if (interestTypes[l.interest] !== undefined) interestTypes[l.interest]++; });
-                        
+                        leads.forEach(l => { if (interestTypes[l.interes] !== undefined) interestTypes[l.interes]++; });
                         const maxCount = Math.max(...Object.values(interestTypes), 1);
-                        
                         const formatLabel = (key) => key === 'ia-legal' ? 'Inteligencia Artificial' : key === 'vigilancia' ? 'Vigilancia Judicial' : key === 'consulta' ? 'Consulta' : key === 'asesoria' ? 'Asesoría' : 'Gestión CRM/ERP';
-
                         return (
                           <div className="flex items-end justify-around h-40 pt-4 border-b border-white/10 pb-4">
                             {Object.entries(interestTypes).map(([key, count], i) => {
@@ -3213,12 +2898,7 @@ const AdminDashboard = ({ onExit }) => {
                               return (
                                 <div key={i} className="flex flex-col items-center justify-end h-full w-full max-w-[120px] group">
                                   <div className="text-xs font-bold text-cyan-400 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">{count}</div>
-                                  <div className="w-full bg-slate-950 border border-white/5 rounded-t-lg relative flex items-end justify-center h-full">
-                                    <div 
-                                      style={{height: `${heightPercent}%`}} 
-                                      className="w-full bg-gradient-to-t from-blue-600 to-cyan-400 rounded-t-lg transition-all duration-1000 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                                    />
-                                  </div>
+                                  <div className="w-full bg-slate-950 border border-white/5 rounded-t-lg relative flex items-end justify-center h-full"><div style={{height: `${heightPercent}%`}} className="w-full bg-gradient-to-t from-blue-600 to-cyan-400 rounded-t-lg transition-all duration-1000 shadow-[0_0_15px_rgba(6,182,212,0.2)]" /></div>
                                   <span className="text-[10px] text-slate-400 mt-3 text-center leading-tight h-8 flex items-center">{formatLabel(key)}</span>
                                 </div>
                               );
@@ -3227,7 +2907,6 @@ const AdminDashboard = ({ onExit }) => {
                         );
                       })()}
                     </div>
-
                   </div>
                 </>
               )}
@@ -3235,7 +2914,6 @@ const AdminDashboard = ({ onExit }) => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
@@ -3255,7 +2933,6 @@ export default function App() {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-          // Removido signInAnonymously para garantizar autenticación estricta (Sprint 1)
           console.log("Esperando autenticación de usuario...");
         }
       } catch (error) {
