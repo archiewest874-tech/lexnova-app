@@ -68,14 +68,12 @@ import {
   updateDoc, 
   doc, 
   getDoc, 
-  setDoc,
-  query,
-  where
+  setDoc 
 } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "",
+const myFirebaseConfig = {
+  apiKey: "", // Se proveerá en ejecución
   authDomain: "lexnova-production.firebaseapp.com",
   projectId: "lexnova-production",
   storageBucket: "lexnova-production.firebasestorage.app",
@@ -83,16 +81,19 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:75917035224:web:cc9219b5896b4460f0f9ad"
 };
 
-const app = initializeApp(firebaseConfig);
+const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const finalConfig = envConfig && Object.keys(envConfig).length > 0 ? envConfig : myFirebaseConfig;
+
+const app = initializeApp(finalConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'lexnova-production';
 
-// Instancia secundaria para creación de usuarios sin desloguear al admin
-const secondaryApp = initializeApp(firebaseConfig, "SecondaryAuth");
+// Instancia secundaria para poder crear clientes sin desloguear al Administrador
+const secondaryApp = initializeApp(finalConfig, "SecondaryAuth");
 const secondaryAuth = getAuth(secondaryApp);
 
-// --- Helpers ---
+// --- Funciones Globales de Formato ---
 const formatCOP = (val) => {
   if (!val) return '';
   const num = Number(val.toString().replace(/[^0-9]/g, ''));
@@ -105,6 +106,7 @@ const parseCOP = (val) => {
   return Number(val.toString().replace(/[^0-9]/g, ''));
 };
 
+// --- Custom Hooks for Animations ---
 const useScrollReveal = () => {
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -115,8 +117,10 @@ const useScrollReveal = () => {
         }
       });
     }, { threshold: 0.1 });
+
     const elements = document.querySelectorAll('.reveal-on-scroll');
     elements.forEach((el) => observer.observe(el));
+
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 };
@@ -125,10 +129,13 @@ const scrollToSection = (e, targetId) => {
   e.preventDefault();
   const container = document.getElementById('main-scroll-container');
   const element = document.getElementById(targetId);
+  
   if (container && element) {
     const navHeight = 80; 
+    const containerTop = container.getBoundingClientRect().top;
     const elementTop = element.getBoundingClientRect().top;
-    const scrollPos = elementTop + container.scrollTop - navHeight;
+    const scrollPos = elementTop - containerTop + container.scrollTop - navHeight;
+
     container.scrollTo({ top: scrollPos, behavior: "smooth" });
   }
 };
@@ -137,6 +144,7 @@ const scrollToSection = (e, targetId) => {
 
 const NavBar = ({ onOpenModal }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const handleNavClick = (e, targetId) => {
     setIsMobileMenuOpen(false); 
     scrollToSection(e, targetId);
@@ -149,6 +157,7 @@ const NavBar = ({ onOpenModal }) => {
           <Scale className="text-cyan-400 w-8 h-8 group-hover:scale-110 transition-transform" />
           <span className="text-white font-bold text-xl tracking-tight">Lex<span className="text-cyan-400">Nova</span></span>
         </div>
+        
         <div className="hidden lg:flex gap-8 text-sm font-medium text-slate-300">
           <a href="#ecosistema" onClick={(e) => handleNavClick(e, 'ecosistema')} className="hover:text-cyan-400 transition-colors cursor-pointer">Ecosistema</a>
           <a href="#soluciones" onClick={(e) => handleNavClick(e, 'soluciones')} className="hover:text-cyan-400 transition-colors cursor-pointer">Soluciones</a>
@@ -156,6 +165,7 @@ const NavBar = ({ onOpenModal }) => {
           <a href="#portal-cliente" onClick={(e) => handleNavClick(e, 'portal-cliente')} className="hover:text-cyan-400 transition-colors cursor-pointer">Portal Clientes</a>
           <a href="#casos-exito" onClick={(e) => handleNavClick(e, 'casos-exito')} className="hover:text-cyan-400 transition-colors cursor-pointer">Éxito</a>
         </div>
+        
         <div className="hidden lg:flex items-center gap-4">
           <button onClick={(e) => handleNavClick(e, 'portal-cliente')} className="text-slate-300 hover:text-cyan-400 text-sm font-medium transition-colors items-center gap-2 flex">
             <User className="w-4 h-4" /> Ingresar
@@ -165,10 +175,12 @@ const NavBar = ({ onOpenModal }) => {
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
+
         <button className="lg:hidden text-slate-300 hover:text-white p-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
           {isMobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
         </button>
       </div>
+
       {isMobileMenuOpen && (
         <div className="lg:hidden absolute top-20 left-0 w-full bg-slate-900 border-b border-white/10 shadow-2xl animate-fade-in-down origin-top">
           <div className="flex flex-col px-6 py-6 gap-5">
@@ -176,6 +188,7 @@ const NavBar = ({ onOpenModal }) => {
             <a href="#soluciones" onClick={(e) => handleNavClick(e, 'soluciones')} className="text-base font-medium text-slate-300 hover:text-cyan-400">Soluciones</a>
             <a href="#laboratorio-ia" onClick={(e) => handleNavClick(e, 'laboratorio-ia')} className="text-base font-medium text-slate-300 hover:text-cyan-400 flex items-center gap-2"><Sparkles className="w-4 h-4 text-cyan-400"/> IA Legal</a>
             <a href="#portal-cliente" onClick={(e) => handleNavClick(e, 'portal-cliente')} className="text-base font-medium text-slate-300 hover:text-cyan-400">Portal Clientes</a>
+            <hr className="border-white/10 my-2" />
             <button onClick={(e) => handleNavClick(e, 'portal-cliente')} className="flex items-center gap-3 text-base font-medium text-slate-300 hover:text-cyan-400">
               <User className="w-5 h-5" /> Ingresar al Portal
             </button>
@@ -232,7 +245,7 @@ const ExplainerCards = () => {
         <div className="grid md:grid-cols-3 gap-6">
           {cards.map((card, idx) => (
             <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-8 hover:bg-white/10 transition-all duration-500 group reveal-on-scroll opacity-0 translate-y-10" style={{ transitionDelay: `${idx * 150}ms` }}>
-              <div className="w-16 h-16 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
                 {card.icon}
               </div>
               <h3 className="text-xl font-bold text-white mb-3">{card.title}</h3>
@@ -253,13 +266,8 @@ const AILabModule = () => {
   const [error, setError] = useState('');
 
   const analyzeCase = async () => {
-    if (!inputText.trim()) {
-      setError("Por favor, ingresa los hechos del caso.");
-      return;
-    }
-    setLoading(true);
-    setError('');
-    setResult(null);
+    if (!inputText.trim()) { setError("Por favor, ingresa los hechos del caso."); return; }
+    setLoading(true); setError(''); setResult(null);
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -269,11 +277,7 @@ const AILabModule = () => {
       if (!response.ok) throw new Error("Error en el análisis de IA.");
       const data = await response.json();
       setResult(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
   return (
@@ -288,8 +292,8 @@ const AILabModule = () => {
         <div className="grid md:grid-cols-2 gap-8 reveal-on-scroll opacity-0 translate-y-10">
           <div className="bg-slate-950 border border-white/10 rounded-2xl p-6 flex flex-col">
             <h3 className="text-white font-semibold mb-6 flex items-center gap-2"><FileText className="w-5 h-5 text-slate-400" /> Hechos del Expediente</h3>
-            <textarea className="w-full bg-slate-900 border border-white/5 rounded-xl p-4 text-slate-300 h-48 mb-6 focus:ring-2 focus:ring-cyan-500/50 outline-none" placeholder="Describe los hechos jurídicos..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
-            <button onClick={analyzeCase} disabled={loading} className="w-full py-4 bg-white text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-slate-200">
+            <textarea className="w-full bg-slate-900 border border-white/5 rounded-xl p-4 text-slate-300 h-48 mb-6 outline-none focus:ring-2 focus:ring-cyan-500/50" placeholder="Describe los hechos jurídicos..." value={inputText} onChange={(e) => setInputText(e.target.value)} />
+            <button onClick={analyzeCase} disabled={loading} className="w-full py-4 bg-white text-slate-950 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all">
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Analizar con IA
             </button>
           </div>
@@ -306,8 +310,10 @@ const AILabModule = () => {
                   <p className="text-slate-300 text-sm leading-relaxed">{result.resumen_ejecutivo}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Nivel de Riesgo</h4>
-                  <p className="text-lg font-bold text-white">{result.nivel_riesgo}</p>
+                  <h4 className="text-xs uppercase text-slate-500 font-bold mb-2">Puntos Clave</h4>
+                  <ul className="space-y-1">
+                    {result.puntos_clave?.map((p, i) => <li key={i} className="text-sm text-slate-400 flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-cyan-400"/> {p}</li>)}
+                  </ul>
                 </div>
               </div>
             )}
@@ -330,13 +336,11 @@ const ClientPortalModule = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Sprint 1: Verificación de Rol Cliente en la ruta oficial
       const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid);
       const userSnap = await getDoc(userRef);
       
@@ -346,19 +350,9 @@ const ClientPortalModule = () => {
         if (clientSnap.exists()) {
           setClientData({ id: clientSnap.id, ...clientSnap.data() });
           setIsLoggedIn(true);
-        } else {
-          setError("Perfil de cliente no encontrado.");
-          await signOut(auth);
-        }
-      } else {
-        setError("Acceso denegado. Este portal es exclusivo para clientes.");
-        await signOut(auth);
-      }
-    } catch (err) {
-      setError("Credenciales inválidas.");
-    } finally {
-      setLoading(false);
-    }
+        } else { setError("Perfil de cliente no encontrado."); await signOut(auth); }
+      } else { setError("Portal exclusivo para clientes."); await signOut(auth); }
+    } catch (err) { setError("Credenciales inválidas."); } finally { setLoading(false); }
   };
 
   return (
@@ -370,9 +364,10 @@ const ClientPortalModule = () => {
           </div>
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Portal de Acceso a Clientes</h2>
         </div>
+
         {!isLoggedIn ? (
           <div className="max-w-md mx-auto bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
-            <form onSubmit={handleLogin} className="space-y-4">
+             <form onSubmit={handleLogin} className="space-y-4">
               {error && <p className="text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg">{error}</p>}
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase mb-2">Email</label>
@@ -388,45 +383,197 @@ const ClientPortalModule = () => {
             </form>
           </div>
         ) : (
-          <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[600px]">
-            <div className="w-full md:w-64 bg-slate-950/50 p-6 border-r border-white/5 flex flex-col">
-              <div className="flex items-center gap-3 mb-10">
-                <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50">
-                  <User className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white truncate w-32">{clientData?.nombres}</p>
-                  <p className="text-xs text-slate-500">Expediente Activo</p>
-                </div>
-              </div>
-              <nav className="space-y-2 flex-1">
-                {['resumen', 'documentos', 'facturacion'].map(t => (
-                  <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === t ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-white'}`}>
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </nav>
-              <button onClick={() => { setIsLoggedIn(false); signOut(auth); }} className="mt-8 text-red-400 hover:bg-red-400/10 p-3 rounded-xl text-sm flex items-center gap-2"><LogOut className="w-4 h-4"/> Salir</button>
-            </div>
-            <div className="flex-1 p-10">
-              <h3 className="text-2xl font-bold text-white mb-8 capitalize">{activeTab}</h3>
-              {activeTab === 'resumen' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                    <p className="text-xs text-slate-500 uppercase mb-1">Nombre</p>
-                    <p className="text-lg font-bold text-white">{clientData?.nombres}</p>
+          <div className="bg-slate-900 border border-white/10 rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
+             <div className="w-full md:w-64 bg-slate-950/50 p-6 border-r border-white/5 flex flex-col">
+                <div className="flex items-center gap-3 mb-10">
+                  <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50">
+                    <User className="w-5 h-5 text-cyan-400" />
                   </div>
-                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                    <p className="text-xs text-slate-500 uppercase mb-1">Cédula / NIT</p>
-                    <p className="text-lg font-bold text-white">{clientData?.cedula_nit}</p>
-                  </div>
+                  <p className="text-sm font-bold text-white truncate">{clientData?.nombres}</p>
                 </div>
-              )}
-            </div>
+                <nav className="space-y-2 flex-1">
+                  {['resumen', 'documentos', 'facturacion'].map(t => (
+                    <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === t ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-400 hover:text-white'}`}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </nav>
+                <button onClick={() => { setIsLoggedIn(false); signOut(auth); }} className="mt-8 text-red-400 hover:bg-red-400/10 p-3 rounded-xl text-sm flex items-center gap-2"><LogOut className="w-4 h-4"/> Salir</button>
+             </div>
+             <div className="flex-1 p-10">
+               <h3 className="text-2xl font-bold text-white mb-8 capitalize">{activeTab}</h3>
+               {activeTab === 'resumen' && (
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                      <p className="text-xs text-slate-500 uppercase mb-1">Nombre</p>
+                      <p className="text-lg font-bold text-white">{clientData?.nombres}</p>
+                    </div>
+                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                      <p className="text-xs text-slate-500 uppercase mb-1">Cédula / NIT</p>
+                      <p className="text-lg font-bold text-white">{clientData?.cedula_nit}</p>
+                    </div>
+                 </div>
+               )}
+             </div>
           </div>
         )}
       </div>
     </section>
+  );
+};
+
+const ComparisonModule = () => {
+  useScrollReveal();
+  const [activeTab, setActiveTab] = useState('crm');
+  const content = {
+    crm: { title: "CRM Legal", subtitle: "Relación y Captación", points: ["Gestión de Leads.", "Automatización de emails.", "Control de agenda."], color: "from-blue-500 to-indigo-600" },
+    erp: { title: "ERP Jurídico", subtitle: "Gestión Financiera", points: ["Facturación electrónica.", "Time Tracking.", "Rentabilidad por socio."], color: "from-emerald-400 to-teal-600" },
+    case: { title: "Case Management", subtitle: "Control Procesal", points: ["Integración Rama Judicial.", "Notificaciones de términos.", "Repositorio seguro."], color: "from-purple-500 to-pink-600" }
+  };
+  return (
+    <section id="soluciones" className="py-24 bg-slate-900/50 border-y border-white/5">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="reveal-on-scroll opacity-0 translate-y-10">
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Herramientas Especializadas.</h2>
+            <div className="flex flex-col gap-4">
+              {Object.keys(content).map((key) => (
+                <button key={key} onClick={() => setActiveTab(key)} className={`text-left p-6 rounded-xl border transition-all ${activeTab === key ? 'bg-white/10 border-white/20' : 'bg-transparent border-transparent hover:bg-white/5'}`}>
+                  <h3 className={`text-xl font-bold ${activeTab === key ? 'text-white' : 'text-slate-400'}`}>{content[key].title}</h3>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="relative h-[400px] reveal-on-scroll opacity-0 translate-y-10 delay-200">
+            <div className={`absolute inset-0 rounded-3xl bg-slate-950 border border-white/10 p-10 flex flex-col justify-center`}>
+              <h3 className="text-3xl font-bold text-white mb-8">{content[activeTab].title}</h3>
+              <ul className="space-y-4">
+                {content[activeTab].points.map((point, i) => <li key={i} className="flex items-center gap-4 text-slate-300 text-lg"><CheckCircle2 className="w-6 h-6 text-cyan-400"/> {point}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const KeyInsights = () => (
+  <section className="py-24">
+    <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-3 gap-8">
+      {[{ v: "85%", l: "Ahorro de tiempo." }, { v: "0", l: "Vencimientos de términos." }, { v: "3x", l: "Más rentabilidad." }].map((s, i) => (
+        <div key={i} className="text-center p-8 rounded-2xl bg-white/5 border border-white/10">
+          <div className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-4">{s.v}</div>
+          <div className="text-slate-300 font-medium text-lg">{s.l}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+);
+
+const SuccessStories = () => (
+  <section id="casos-exito" className="py-24 bg-slate-900 border-y border-white/5">
+    <div className="max-w-7xl mx-auto px-6">
+      <h2 className="text-3xl md:text-5xl font-bold text-white text-center mb-16">Resultados Reales.</h2>
+      <div className="grid lg:grid-cols-3 gap-8">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-slate-950 border border-white/10 rounded-3xl p-8 hover:border-cyan-500/50 transition-all">
+            <Quote className="text-cyan-400 mb-4" />
+            <p className="text-slate-400">"LexNova transformó nuestra firma. Ahora todo es digital y automático."</p>
+            <p className="text-white font-bold mt-6">Firma Jurídica {i}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+const ScrollStory = () => (
+  <section className="py-24 max-w-4xl mx-auto px-6">
+    <h2 className="text-3xl md:text-5xl font-bold text-white text-center mb-16">El Paradigma de 2026</h2>
+    <div className="space-y-12">
+      <div className="flex gap-6"><div className="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 font-bold shrink-0">1</div><div><h3 className="text-2xl font-bold text-white mb-2">Notificaciones Electrónicas</h3><p className="text-slate-400">Trazabilidad absoluta bajo Ley 527/99.</p></div></div>
+      <div className="flex gap-6"><div className="w-12 h-12 rounded-full bg-cyan-400/20 flex items-center justify-center text-cyan-400 font-bold shrink-0">2</div><div><h3 className="text-2xl font-bold text-white mb-2">Ciberseguridad</h3><p className="text-slate-400">Encriptación militar para el secreto profesional.</p></div></div>
+    </div>
+  </section>
+);
+
+const CTASection = ({ onOpenModal }) => (
+  <section className="py-24 text-center relative overflow-hidden">
+    <div className="absolute inset-0 bg-blue-600/5" />
+    <h2 className="text-4xl md:text-6xl font-extrabold text-white mb-6">Lidera la Práctica Jurídica.</h2>
+    <button onClick={onOpenModal} className="px-10 py-5 bg-white text-slate-950 rounded-full font-bold shadow-lg flex items-center gap-3 mx-auto group">
+      Solicitar Demo <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+    </button>
+  </section>
+);
+
+const Footer = ({ onOpenLegal, onOpenAdmin }) => (
+  <footer className="bg-slate-950 py-12 border-t border-white/10">
+    <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="flex items-center gap-2 font-bold text-lg text-slate-400 cursor-pointer" onClick={() => window.scrollTo({top:0, behavior:'smooth'})}>LexNova</div>
+      <p className="text-slate-600 text-sm">© 2026 LexNova Digital Experiences.</p>
+      <div className="flex gap-6 text-sm text-slate-500">
+        <button onClick={() => onOpenLegal('privacidad')}>Privacidad</button>
+        <button onClick={() => onOpenLegal('terminos')}>Términos</button>
+        <button onClick={onOpenAdmin} className="text-cyan-400 flex items-center gap-1"><ShieldCheck size={14}/> Admin</button>
+      </div>
+    </div>
+  </footer>
+);
+
+const LegalModal = ({ isOpen, onClose, type }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl animate-fade-in-up">
+        <h3 className="text-2xl font-bold text-white mb-4 capitalize">{type}</h3>
+        <p className="text-slate-400 text-sm leading-relaxed">Contenido legal detallado según Ley 1581 de 2012 y CGP...</p>
+        <button onClick={onClose} className="mt-8 px-6 py-2 bg-white/10 text-white rounded-lg">Cerrar</button>
+      </div>
+    </div>
+  );
+};
+
+const RegistrationModal = ({ isOpen, onClose }) => {
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', interest: '' });
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leads'), {
+        ...formData, estado: 'nuevo', fechaRegistro: new Date().toISOString()
+      });
+      setSuccess(true);
+      setTimeout(() => { onClose(); setSuccess(false); setFormData({name:'', email:'', phone:'', interest:''}); }, 2000);
+    } catch (err) { alert("Error al registrar."); } finally { setLoading(false); }
+  };
+
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl animate-fade-in-up">
+        {!success ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <h3 className="text-2xl font-bold text-white mb-4">Solicitar Atención</h3>
+            <input required placeholder="Nombre" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+            <input required type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            <input required placeholder="Teléfono" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+            <select required className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={formData.interest} onChange={e => setFormData({...formData, interest: e.target.value})}>
+              <option value="">Interés...</option>
+              <option value="ia-legal">IA Legal</option>
+              <option value="vigilancia">Vigilancia</option>
+            </select>
+            <button type="submit" disabled={loading} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl">{loading ? 'Enviando...' : 'Enviar'}</button>
+          </form>
+        ) : <div className="text-center py-10 text-emerald-400 font-bold">¡Solicitud Enviada!</div>}
+      </div>
+    </div>
   );
 };
 
@@ -437,33 +584,18 @@ const AdminDashboard = ({ onExit }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [leads, setLeads] = useState([]);
-  const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState(null);
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
-      // Sprint 1: Verificación estricta de Rol Admin
       const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', user.uid);
       const userSnap = await getDoc(userRef);
-      
-      if (userSnap.exists() && userSnap.data().rol === 'admin') {
-        setIsAuthenticated(true);
-        fetchLeads();
-      } else {
-        setError("No tienes privilegios de administrador.");
-        await signOut(auth);
-      }
-    } catch (err) {
-      setError("Credenciales incorrectas.");
-    } finally {
-      setLoading(false);
-    }
+      if (userSnap.exists() && userSnap.data().rol === 'admin') { setIsAuthenticated(true); fetchLeads(); }
+      else { setError("No tienes permisos de administrador."); await signOut(auth); }
+    } catch (err) { setError("Credenciales incorrectas."); } finally { setLoading(false); }
   };
 
   const fetchLeads = async () => {
@@ -474,39 +606,18 @@ const AdminDashboard = ({ onExit }) => {
   const convertToClient = async (lead) => {
     setLoading(true);
     try {
-      const tempPassword = "Lex" + Math.floor(1000 + Math.random() * 9000);
-      
-      // 1. Crear en Firebase Auth usando instancia secundaria
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, lead.email, tempPassword);
-      const newUid = userCredential.user.uid;
+      const tempPass = "Lex" + Math.floor(1000 + Math.random() * 9000);
+      const userCred = await createUserWithEmailAndPassword(secondaryAuth, lead.email, tempPass);
+      const newUid = userCred.user.uid;
       await signOut(secondaryAuth);
 
-      // 2. Registrar en Colección 'usuarios' (Sprint 1)
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUid), {
-        uid: newUid,
-        email: lead.email,
-        rol: 'cliente'
-      });
-
-      // 3. Registrar en Colección 'clientes'
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUid), {
-        idCliente: newUid,
-        nombres: lead.name,
-        email: lead.email,
-        telefono: lead.phone,
-        fechaRegistro: new Date().toISOString()
-      });
-
-      // 4. Marcar Lead como convertido
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'usuarios', newUid), { uid: newUid, email: lead.email, rol: 'cliente' });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'clientes', newUid), { idCliente: newUid, nombres: lead.name, email: lead.email, telefono: lead.phone, fechaRegistro: new Date().toISOString() });
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leads', lead.id), { estado: 'convertido' });
       
-      alert(`Cliente creado con éxito. Contraseña temporal: ${tempPassword}`);
+      alert(`Cliente creado. Contraseña: ${tempPass}`);
       fetchLeads();
-    } catch (err) {
-      alert("Error en la conversión: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert(err.message); } finally { setLoading(false); }
   };
 
   if (!isAuthenticated) {
@@ -516,11 +627,11 @@ const AdminDashboard = ({ onExit }) => {
           <h2 className="text-2xl font-bold text-white text-center mb-6">Admin Login</h2>
           <form onSubmit={handleAdminLogin} className="space-y-4">
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" required />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" required />
-            <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">{loading ? 'Verificando...' : 'Entrar'}</button>
+            <input type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={email} onChange={e=>setEmail(e.target.value)} required />
+            <input type="password" placeholder="Password" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white" value={password} onChange={e=>setPassword(e.target.value)} required />
+            <button type="submit" disabled={loading} className="w-full py-3 bg-white text-slate-950 font-bold rounded-xl">{loading ? 'Entrando...' : 'Entrar'}</button>
           </form>
-          <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm hover:text-white">Regresar al sitio</button>
+          <button onClick={onExit} className="mt-4 w-full text-slate-500 text-sm">Regresar</button>
         </div>
       </div>
     );
@@ -528,95 +639,22 @@ const AdminDashboard = ({ onExit }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-10">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-10">
-          <h1 className="text-3xl font-bold">LexNova Admin Dashboard</h1>
-          <button onClick={() => { setIsAuthenticated(false); signOut(auth); }} className="text-red-400 flex items-center gap-2"><LogOut size={18}/> Salir</button>
-        </div>
-        <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-950 border-b border-white/10 text-slate-400">
-              <tr>
-                <th className="p-4">Nombre</th>
-                <th className="p-4">Email</th>
-                <th className="p-4">Estado</th>
-                <th className="p-4 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {leads.map(l => (
-                <tr key={l.id} className="hover:bg-white/5">
-                  <td className="p-4">{l.name}</td>
-                  <td className="p-4">{l.email}</td>
-                  <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs ${l.estado === 'convertido' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>{l.estado}</span></td>
-                  <td className="p-4 text-right">
-                    {l.estado !== 'convertido' && (
-                      <button onClick={() => convertToClient(l)} className="bg-indigo-600 hover:bg-indigo-500 px-3 py-1 rounded-lg text-xs font-bold transition-all">Convertir</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="max-w-6xl mx-auto flex justify-between mb-10">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <button onClick={()=>{setIsAuthenticated(false); signOut(auth);}} className="text-red-400 flex items-center gap-2"><LogOut size={18}/> Salir</button>
       </div>
-    </div>
-  );
-};
-
-const RegistrationModal = ({ isOpen, onClose, user }) => {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', interest: '' });
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leads'), {
-        ...formData,
-        estado: 'nuevo',
-        fechaRegistro: new Date().toISOString()
-      });
-      setSuccess(true);
-      setTimeout(() => { onClose(); setSuccess(false); setFormData({name:'', email:'', phone:'', interest:''}); }, 2500);
-    } catch (err) {
-      alert("Error al enviar registro.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl">
-        {!success ? (
-          <>
-            <h3 className="text-2xl font-bold text-white mb-6">Solicitar Atención</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input required placeholder="Nombre Completo" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-              <input required type="email" placeholder="Email" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-              <input required placeholder="Teléfono" className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-              <select required className="w-full bg-slate-950 border border-white/10 p-3 rounded-xl text-white outline-none" value={formData.interest} onChange={e => setFormData({...formData, interest: e.target.value})}>
-                <option value="">Selecciona interés...</option>
-                <option value="consulta">Consulta</option>
-                <option value="ia-legal">IA Legal</option>
-                <option value="vigilancia">Vigilancia Judicial</option>
-              </select>
-              <button type="submit" disabled={loading} className="w-full py-4 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 transition-all">
-                {loading ? <Loader2 className="animate-spin mx-auto"/> : 'Enviar Solicitud'}
-              </button>
-            </form>
-          </>
-        ) : (
-          <div className="text-center py-10">
-            <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white">¡Registro Exitoso!</h3>
-          </div>
-        )}
+      <div className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-950 text-slate-400"><tr><th className="p-4">Nombre</th><th className="p-4">Email</th><th className="p-4 text-right">Acción</th></tr></thead>
+          <tbody className="divide-y divide-white/5">
+            {leads.map(l => (
+              <tr key={l.id} className="hover:bg-white/5">
+                <td className="p-4">{l.name}</td><td className="p-4">{l.email}</td>
+                <td className="p-4 text-right">{l.estado !== 'convertido' && <button onClick={()=>convertToClient(l)} className="bg-indigo-600 px-3 py-1 rounded-lg text-xs">Convertir</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -625,6 +663,7 @@ const RegistrationModal = ({ isOpen, onClose, user }) => {
 export default function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [legalModal, setLegalModal] = useState({ isOpen: false, type: 'privacidad' });
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -641,15 +680,20 @@ export default function App() {
       <ExplainerCards />
       <AILabModule />
       <ClientPortalModule />
+      <ComparisonModule />
+      <KeyInsights />
+      <SuccessStories />
+      <ScrollStory />
+      <CTASection onOpenModal={() => setIsRegistrationOpen(true)} />
       
-      <footer className="py-20 border-t border-white/5 bg-slate-950 text-center">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-slate-500 text-sm">© 2026 LexNova Digital Experiences. Todos los derechos reservados.</p>
-          <button onClick={() => setCurrentView('admin')} className="text-slate-500 hover:text-white text-sm flex items-center gap-2"><ShieldCheck size={14}/> Admin</button>
-        </div>
-      </footer>
-
-      <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} user={user} />
+      <Footer onOpenLegal={(type) => setLegalModal({ isOpen: true, type })} onOpenAdmin={() => setCurrentView('admin')} />
+      
+      <RegistrationModal isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} />
+      <LegalModal isOpen={legalModal.isOpen} type={legalModal.type} onClose={() => setLegalModal({ ...legalModal, isOpen: false })} />
+      
+      <button onClick={() => document.getElementById('main-scroll-container').scrollTo({top:0, behavior:'smooth'})} className="fixed bottom-8 right-8 p-4 bg-cyan-500 text-slate-950 rounded-full shadow-lg z-50">
+        <ArrowUp />
+      </button>
     </div>
   );
 }
